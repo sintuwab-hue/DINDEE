@@ -1,0 +1,3363 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ดินดี Terminal — ตลาดที่ดินไทย แบบเรียลไทม์</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Prompt:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          thai: ['IBM Plex Sans Thai', 'system-ui', 'sans-serif'],
+          display: ['Prompt', 'IBM Plex Sans Thai', 'sans-serif'],
+          mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+        },
+        colors: {
+          brand: {
+            50:'#f3f9f4',100:'#e3f1e6',200:'#c6e2cd',300:'#9bcaa7',400:'#69ac7c',
+            500:'#458e5d',600:'#347248',700:'#2b5b3a',800:'#244830',900:'#1e3a28',
+          },
+          ink: { 900:'#0a0e14', 800:'#11151c', 700:'#1a1f2a', 600:'#252b38' },
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html, body { font-family: 'IBM Plex Sans Thai', system-ui, sans-serif; background: #f4f4f3; }
+  .display { font-family: 'Prompt', 'IBM Plex Sans Thai', sans-serif; letter-spacing: -0.01em; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .input { @apply w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition; }
+  .label { @apply block text-sm font-medium text-stone-700 mb-1.5; }
+  .btn-primary { @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg transition shadow-sm; }
+  .btn-secondary { @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-stone-50 text-stone-700 text-sm font-semibold rounded-lg border border-stone-300 transition; }
+  .btn-ghost { @apply inline-flex items-center justify-center gap-2 px-3 py-2 text-stone-600 hover:text-stone-900 hover:bg-stone-100 text-sm font-medium rounded-lg transition; }
+  .btn-dark { @apply inline-flex items-center justify-center gap-2 px-3 py-2 bg-ink-700 hover:bg-ink-600 text-white text-sm font-medium rounded-lg transition; }
+  .card { @apply bg-white border border-stone-200 rounded-xl; }
+  .deed-chip { @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold; }
+  .badge-good { @apply bg-emerald-50 text-emerald-700 border border-emerald-200; }
+  .badge-warn { @apply bg-amber-50 text-amber-700 border border-amber-200; }
+  .badge-bad  { @apply bg-rose-50 text-rose-700 border border-rose-200; }
+  .badge-info { @apply bg-sky-50 text-sky-700 border border-sky-200; }
+  .badge-neutral { @apply bg-stone-100 text-stone-700 border border-stone-200; }
+  .text-up { color: #16a34a; }
+  .text-down { color: #dc2626; }
+  .text-flat { color: #6b7280; }
+  /* Animations */
+  @keyframes fadeIn { from { opacity:0; transform: translateY(8px);} to {opacity:1; transform:none;} }
+  .fade-in { animation: fadeIn .25s ease-out both; }
+  @keyframes ticker-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+  .ticker-track { animation: ticker-scroll 90s linear infinite; }
+  @keyframes pulse-dot { 0%,100% { opacity:1;} 50% { opacity:0.4;} }
+  .pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+  /* Tabs */
+  .tab-btn { @apply px-4 py-3 text-sm font-semibold text-stone-500 border-b-2 border-transparent hover:text-stone-800 transition; }
+  .tab-btn.active { @apply text-brand-700 border-brand-600; }
+  /* Timeframe buttons */
+  .tf-btn { @apply px-3 py-1 text-xs font-semibold rounded text-stone-600 hover:bg-stone-100 transition; }
+  .tf-btn.active { @apply bg-stone-900 text-white hover:bg-stone-900; }
+  /* Symbol pill */
+  .symbol { @apply inline-flex items-center px-2 py-1 bg-ink-900 text-white rounded text-xs font-bold; font-family: 'JetBrains Mono', monospace; }
+  /* Modal */
+  .modal-backdrop { background: rgba(10, 14, 20, 0.65); backdrop-filter: blur(6px); }
+  /* Map plot rect */
+  .plot-shape { stroke: #f59e0b; stroke-width: 2; fill: rgba(245, 158, 11, 0.18); }
+  /* Sparkline — FIXED HEIGHT WRAPPER (Chart.js bugfix) */
+  .spark-wrap { position: relative; width: 100%; height: 40px; margin-top: 6px; overflow: hidden; }
+  .spark-wrap canvas { position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; max-height: 40px !important; }
+  /* General canvas safety net */
+  canvas { max-height: 800px; }
+  /* Section header */
+  .section-h { @apply flex items-center justify-between mb-3; }
+  .section-h h2 { @apply display font-bold text-base text-stone-800; }
+  /* Hide scrollbar in ticker */
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  /* Watchlist drawer */
+  .drawer { transform: translateX(100%); transition: transform .3s ease; }
+  .drawer.open { transform: translateX(0); }
+  /* Active filter dot */
+  .active-dot { @apply absolute -top-0.5 -right-0.5 w-2 h-2 bg-brand-500 rounded-full; }
+  /* Verification tier badges */
+  .tier-1 { @apply bg-stone-100 text-stone-600 border border-stone-300; }
+  .tier-2 { @apply bg-sky-100 text-sky-700 border border-sky-300; }
+  .tier-3 { @apply bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-800 border border-amber-400; }
+  .tier-badge { @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold; }
+  /* Feature badges (NEW, HOT, PRICE DROP) */
+  .fbadge { @apply inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider; }
+  .fbadge-new { @apply bg-emerald-500 text-white; }
+  .fbadge-hot { @apply bg-rose-500 text-white; }
+  .fbadge-drop { @apply bg-orange-500 text-white; }
+  .fbadge-feat { @apply bg-amber-500 text-white; }
+  .fbadge-reserved { @apply bg-stone-600 text-white; }
+  /* Trust panel */
+  .trust-row { @apply flex items-start gap-2.5 py-2 text-sm; }
+  .trust-icon-ok { @apply w-7 h-7 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0; }
+  .trust-icon-warn { @apply w-7 h-7 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0; }
+  .trust-icon-info { @apply w-7 h-7 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center shrink-0; }
+  /* Compare floating bar */
+  .compare-bar { transform: translateY(100%); transition: transform .3s ease; }
+  .compare-bar.show { transform: translateY(0); }
+  /* Step indicator */
+  .step-dot { @apply w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2; }
+  .step-dot.done { @apply bg-brand-600 border-brand-600 text-white; }
+  .step-dot.active { @apply bg-white border-brand-600 text-brand-600; }
+  .step-dot.todo { @apply bg-white border-stone-300 text-stone-400; }
+  /* ThaID brand color (官方) */
+  .bg-thaid { background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); }
+  /* Chat bubbles */
+  .bubble-them { @apply bg-stone-100 text-stone-800 rounded-2xl rounded-tl-sm px-3 py-2 max-w-[75%] text-sm; }
+  .bubble-me { @apply bg-brand-600 text-white rounded-2xl rounded-tr-sm px-3 py-2 max-w-[75%] text-sm ml-auto; }
+  /* Trust banner gradient */
+  .trust-banner { background: linear-gradient(90deg, #ecfdf5 0%, #f0f9ff 50%, #fef3c7 100%); }
+  /* Hero */
+  .hero-bg {
+    background:
+      radial-gradient(ellipse 600px 400px at 80% 20%, rgba(105,172,124,0.18) 0%, transparent 50%),
+      radial-gradient(ellipse 500px 350px at 15% 80%, rgba(245,158,11,0.12) 0%, transparent 50%),
+      linear-gradient(180deg, #fafaf9 0%, #f3f9f4 100%);
+  }
+  .blob { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.35; pointer-events: none; }
+  /* Counter animation */
+  @keyframes count-up { from { opacity:0; transform:translateY(10px);} to { opacity:1; transform:none;} }
+  .count-anim { animation: count-up .8s ease-out both; }
+  /* Float animation */
+  @keyframes float { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-8px);} }
+  .float { animation: float 4s ease-in-out infinite; }
+  /* Card hover lift */
+  .lift { transition: transform .25s ease, box-shadow .25s ease; }
+  .lift:hover { transform: translateY(-4px); box-shadow: 0 20px 40px -15px rgba(0,0,0,0.15); }
+  /* Pulse ring */
+  @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(52,114,72,0.4);} 70% { box-shadow: 0 0 0 12px rgba(52,114,72,0);} 100% { box-shadow: 0 0 0 0 rgba(52,114,72,0);} }
+  .pulse-ring { animation: pulse-ring 2s infinite; }
+  /* Sheen on CTA */
+  @keyframes sheen { 0% { background-position: -200% 0;} 100% { background-position: 200% 0;} }
+  .sheen { background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%); background-size: 200% 100%; animation: sheen 3s infinite; }
+  /* Step number */
+  .step-num { @apply w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white flex items-center justify-center font-extrabold text-2xl shadow-lg; }
+  /* Wave divider */
+  .wave-top {
+    background: linear-gradient(180deg, transparent, #fafaf9);
+  }
+  /* Gradient text */
+  .grad-text { background: linear-gradient(135deg, #347248 0%, #69ac7c 50%, #f59e0b 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+</style>
+</head>
+<body class="text-stone-900">
+
+<!-- ============ TICKER BAR ============ -->
+<div class="bg-ink-900 text-stone-100 text-xs overflow-hidden">
+  <div class="flex items-center">
+    <div class="bg-rose-600 px-3 py-2 flex items-center gap-1.5 font-semibold whitespace-nowrap">
+      <span class="w-1.5 h-1.5 bg-white rounded-full pulse-dot"></span> LIVE
+    </div>
+    <div class="flex-1 overflow-hidden">
+      <div id="tickerTrack" class="ticker-track flex gap-8 whitespace-nowrap py-2 px-4 mono">
+        <!-- generated -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ HEADER ============ -->
+<header class="bg-white border-b border-stone-200 sticky top-0 z-40">
+  <div class="max-w-screen-2xl mx-auto px-4 sm:px-6">
+    <div class="flex items-center justify-between h-14">
+      <a href="#" class="flex items-center gap-2 shrink-0" onclick="goHome();return false;">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center">
+          <i data-lucide="trees" class="w-4 h-4 text-white"></i>
+        </div>
+        <div class="leading-tight">
+          <div class="display font-bold text-base text-brand-800">ดินดี <span class="text-stone-400 font-normal text-xs">Terminal</span></div>
+        </div>
+      </a>
+
+      <!-- Search -->
+      <div class="hidden md:flex flex-1 max-w-md mx-6">
+        <div class="relative w-full">
+          <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400"></i>
+          <input id="globalSearch" type="text" placeholder="ค้นหา Symbol, จังหวัด, อำเภอ, เลขโฉนด..." class="w-full pl-9 pr-3 py-2 bg-stone-100 border border-transparent rounded-lg text-sm focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none transition mono" />
+        </div>
+      </div>
+
+      <!-- Right: Market summary + actions -->
+      <div class="flex items-center gap-2">
+        <div class="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-stone-50 rounded-lg border border-stone-200" title="ราคาเฉลี่ยที่ดินทั่วประเทศ / ตารางวา">
+          <span class="text-[10px] text-stone-500">ราคาเฉลี่ย</span>
+          <span class="mono text-sm font-bold text-stone-900" id="indexValue">—</span>
+          <span class="mono text-xs font-semibold" id="indexChange">—</span>
+        </div>
+        <button class="btn-ghost relative !p-2" onclick="openWatchlist()" title="Watchlist">
+          <i data-lucide="star" class="w-5 h-5"></i>
+          <span id="watchlistBadge" class="hidden absolute -top-0.5 -right-0.5 bg-brand-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">0</span>
+        </button>
+        <!-- Account dropdown -->
+        <div class="relative">
+          <button class="btn-ghost !p-2 flex items-center gap-1" onclick="toggleAccountMenu()">
+            <div class="w-7 h-7 rounded-full bg-gradient-to-br from-stone-400 to-stone-600 flex items-center justify-center text-white text-xs font-bold" id="userAvatar">?</div>
+            <i data-lucide="chevron-down" class="w-3 h-3"></i>
+          </button>
+          <div id="accountMenu" class="hidden absolute right-0 top-12 w-72 bg-white border border-stone-200 rounded-xl shadow-xl z-50 overflow-hidden">
+            <div id="accountMenuBody"></div>
+          </div>
+        </div>
+        <button class="btn-primary !py-2" onclick="openAddModal()">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">ลงประกาศ</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ HERO SECTION ============ -->
+<section class="hero-bg relative overflow-hidden border-b border-stone-200">
+  <div class="blob" style="width:400px;height:400px;background:#69ac7c;top:-100px;right:-50px"></div>
+  <div class="blob" style="width:350px;height:350px;background:#f59e0b;bottom:-80px;left:10%"></div>
+
+  <div class="relative max-w-screen-2xl mx-auto px-4 sm:px-6 py-10 md:py-16">
+    <div class="grid lg:grid-cols-5 gap-8 items-center">
+      <!-- Left: Headline + CTAs -->
+      <div class="lg:col-span-3">
+        <div class="inline-flex items-center gap-2 px-3 py-1 bg-white/80 backdrop-blur border border-brand-200 rounded-full text-xs font-semibold text-brand-700 mb-5 shadow-sm">
+          <span class="w-2 h-2 bg-emerald-500 rounded-full pulse-ring"></span>
+          เว็บไซต์แรกของไทย: ที่ดินอย่างเดียว + เจ้าของจริงทุกแปลง
+        </div>
+
+        <h1 class="display text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05] text-stone-900">
+          ที่ดินดีๆ <span class="grad-text">ไม่ต้องตามใคร</span><br/>
+          เห็นราคาจริง <span class="text-amber-600">ทันที</span>
+        </h1>
+
+        <p class="mt-5 text-base md:text-lg text-stone-700 max-w-2xl leading-relaxed">
+          ดูราคาประเมินรัฐ + ราคาตลาด + ประวัติซื้อขายย้อนหลัง ครบในที่เดียว<br/>
+          <strong>ฟรี ไม่มีค่านายหน้า · ผู้ขายผ่าน ThaID ทุกคน · ไม่มีประกาศซ้ำ</strong>
+        </p>
+
+        <div class="mt-7 flex flex-wrap gap-3">
+          <button class="btn-primary !px-6 !py-3.5 !text-base shadow-xl shadow-brand-600/20 hover:shadow-2xl hover:shadow-brand-600/30 hover:scale-105 transition" onclick="scrollToMarket()">
+            <i data-lucide="search" class="w-5 h-5"></i>ค้นหาที่ดิน
+          </button>
+          <button class="btn-secondary !px-6 !py-3.5 !text-base hover:scale-105 transition" onclick="openAddModal()">
+            <i data-lucide="plus-circle" class="w-5 h-5"></i>ลงประกาศฟรี
+          </button>
+        </div>
+
+        <!-- Trust badges -->
+        <div class="mt-7 flex flex-wrap gap-2">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/70 backdrop-blur border border-stone-200 rounded-full text-xs font-medium text-stone-700">🛡️ ตรวจ ThaID + LandsMaps</span>
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/70 backdrop-blur border border-stone-200 rounded-full text-xs font-medium text-stone-700">💰 ฟรี ไม่มีค่านายหน้า</span>
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/70 backdrop-blur border border-stone-200 rounded-full text-xs font-medium text-stone-700">📊 ดูราคาย้อนหลัง 8 ปี</span>
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/70 backdrop-blur border border-stone-200 rounded-full text-xs font-medium text-stone-700">⚡ ไม่มีประกาศซ้ำ</span>
+        </div>
+      </div>
+
+      <!-- Right: Demo card -->
+      <div class="lg:col-span-2 relative">
+        <div class="card p-4 shadow-2xl bg-white float">
+          <div class="flex items-center justify-between mb-3">
+            <span class="symbol">CHO-12345</span>
+            <span class="tier-badge tier-3">⭐ Verified Owner</span>
+          </div>
+          <img src="https://picsum.photos/seed/land1/600/400" class="rounded-lg w-full aspect-video object-cover mb-3" onerror="this.style.display='none'"/>
+          <div class="font-semibold text-sm mb-1">ที่ดินติดถนนใหญ่ บ่อวิน</div>
+          <div class="text-xs text-stone-500 mb-3">ศรีราชา, ชลบุรี · 5-2-50 ไร่</div>
+          <div class="flex items-end justify-between">
+            <div>
+              <div class="mono text-2xl font-extrabold">25,000<span class="text-xs font-normal text-stone-500">/ตร.ว.</span></div>
+              <div class="mono text-xs font-semibold text-up">▲ +38.9% ใน 8 ปี</div>
+            </div>
+            <div class="text-right">
+              <div class="text-[10px] text-stone-500">vs ราคาประเมิน</div>
+              <div class="text-xs font-bold text-rose-600">+39%</div>
+            </div>
+          </div>
+          <div class="mt-3 pt-3 border-t border-stone-100 grid grid-cols-3 gap-1 text-[10px] text-stone-600 text-center">
+            <div>📜 โฉนด</div>
+            <div>🛣️ ติดถนนใหญ่</div>
+            <div>💧 น้ำ+ไฟ</div>
+          </div>
+        </div>
+        <!-- Floating decoration -->
+        <div class="hidden md:flex absolute -top-3 -left-3 bg-emerald-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg float" style="animation-delay:1s">+38.9% 🔥</div>
+        <div class="hidden md:flex absolute -bottom-3 -right-3 bg-amber-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg float" style="animation-delay:2s">⭐ Verified</div>
+      </div>
+    </div>
+
+    <!-- Live stats bar -->
+    <div class="mt-10 grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="card p-4 text-center bg-white/80 backdrop-blur lift">
+        <div class="text-2xl md:text-3xl mb-1">📍</div>
+        <div class="display text-2xl font-extrabold text-brand-700" data-counter="${'${'}listings.length||12${'}'}"><span id="heroStat1">12</span></div>
+        <div class="text-xs text-stone-600 mt-0.5">แปลงที่ดิน</div>
+      </div>
+      <div class="card p-4 text-center bg-white/80 backdrop-blur lift">
+        <div class="text-2xl md:text-3xl mb-1">🗺️</div>
+        <div class="display text-2xl font-extrabold text-brand-700"><span id="heroStat2">8</span></div>
+        <div class="text-xs text-stone-600 mt-0.5">จังหวัด</div>
+      </div>
+      <div class="card p-4 text-center bg-white/80 backdrop-blur lift">
+        <div class="text-2xl md:text-3xl mb-1">🌾</div>
+        <div class="display text-2xl font-extrabold text-brand-700"><span id="heroStat3">130</span></div>
+        <div class="text-xs text-stone-600 mt-0.5">ไร่รวม</div>
+      </div>
+      <div class="card p-4 text-center bg-white/80 backdrop-blur lift">
+        <div class="text-2xl md:text-3xl mb-1">⭐</div>
+        <div class="display text-2xl font-extrabold text-brand-700"><span id="heroStat4">8</span></div>
+        <div class="text-xs text-stone-600 mt-0.5">Verified Owner</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ VALUE PROPS ============ -->
+<section class="bg-white py-12 md:py-16 border-b border-stone-200">
+  <div class="max-w-screen-2xl mx-auto px-4 sm:px-6">
+    <div class="text-center mb-10 max-w-2xl mx-auto">
+      <div class="inline-block px-3 py-1 bg-brand-50 text-brand-700 rounded-full text-xs font-semibold mb-3">WHY DINDEE</div>
+      <h2 class="display text-2xl md:text-3xl font-bold text-stone-900">ทำไมต้องดินดี?</h2>
+      <p class="text-stone-600 mt-2">ตลาดที่ดินไทย 1.3 ล้านล้านบาท/ปี — เราทำให้คนทั่วไปเข้าถึงข้อมูลแบบมืออาชีพได้</p>
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="card p-5 lift">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-100 to-emerald-200 flex items-center justify-center mb-4 text-2xl">🛡️</div>
+        <h3 class="display font-bold text-base mb-2">เจ้าของจริง ไม่มีนายหน้าปลอม</h3>
+        <p class="text-sm text-stone-600 leading-relaxed">ผู้ขายต้องยืนยัน ThaID — Verified Owner ผ่านการ cross-check กับ LandsMaps กรมที่ดิน</p>
+      </div>
+      <div class="card p-5 lift">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center mb-4 text-2xl">📊</div>
+        <h3 class="display font-bold text-base mb-2">ดูราคาย้อนหลัง 8 ปี</h3>
+        <p class="text-sm text-stone-600 leading-relaxed">รู้ว่าที่ดินเคยขายเท่าไหร่ ราคาขึ้นกี่ % เหมือนดูหุ้น SET — ตัดสินใจซื้อด้วยข้อมูลจริง</p>
+      </div>
+      <div class="card p-5 lift">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-100 to-sky-200 flex items-center justify-center mb-4 text-2xl">🏛️</div>
+        <h3 class="display font-bold text-base mb-2">ราคาประเมินรัฐใส่ในการ์ด</h3>
+        <p class="text-sm text-stone-600 leading-relaxed">ข้อมูลจากกรมธนารักษ์ + ผังเมือง + ค่าโอน-ภาษีคำนวณให้สำเร็จ ไม่ต้องเปิด 3 เว็บ</p>
+      </div>
+      <div class="card p-5 lift">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-100 to-rose-200 flex items-center justify-center mb-4 text-2xl">💰</div>
+        <h3 class="display font-bold text-base mb-2">ฟรี ไม่มีค่านายหน้า</h3>
+        <p class="text-sm text-stone-600 leading-relaxed">เราไม่เก็บค่าคอมมิสชั่น ไม่เก็บค่าลงประกาศ — รายได้จากโฆษณาเท่านั้น คุณติดต่อกันได้ตรง</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ MAIN ============ -->
+<main class="max-w-screen-2xl mx-auto px-4 sm:px-6 py-5 space-y-5">
+
+  <!-- ============ RECENTLY VIEWED (hidden by default) ============ -->
+  <section id="recentlyViewedSection" class="hidden">
+    <div class="section-h">
+      <div>
+        <h2 class="display text-base font-bold text-stone-800">ดูล่าสุด</h2>
+      </div>
+      <button class="text-xs text-stone-500 hover:text-stone-700" onclick="clearRecent()">ล้าง</button>
+    </div>
+    <div id="recentlyViewed" class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"></div>
+  </section>
+
+  <!-- ============ MARKET OVERVIEW ============ -->
+  <section>
+    <div class="section-h">
+      <div>
+        <h2 class="display text-xl font-bold text-stone-900">ภาพรวมตลาดที่ดิน</h2>
+        <p class="text-xs text-stone-500" id="marketTime"></p>
+      </div>
+      <div class="hidden md:block text-xs text-stone-500">คลิกการ์ดเพื่อกรองเฉพาะจังหวัดนั้น</div>
+    </div>
+
+    <!-- Provincial indices -->
+    <div id="indicesGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"></div>
+  </section>
+
+  <!-- ============ TOP MOVERS + LATEST + NEWS ============ -->
+  <section class="grid lg:grid-cols-3 gap-4">
+    <div class="card overflow-hidden">
+      <div class="px-4 py-3 border-b border-stone-200 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="trending-up" class="w-4 h-4 text-emerald-600"></i>
+          <h3 class="display font-bold text-sm">ราคาขึ้นมากสุดปีนี้</h3>
+        </div>
+      </div>
+      <div id="topGainers" class="divide-y divide-stone-100"></div>
+    </div>
+
+    <div class="card overflow-hidden">
+      <div class="px-4 py-3 border-b border-stone-200 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="zap" class="w-4 h-4 text-amber-600"></i>
+          <h3 class="display font-bold text-sm">รายการล่าสุด</h3>
+        </div>
+      </div>
+      <div id="latestListings" class="divide-y divide-stone-100"></div>
+    </div>
+
+    <div class="card overflow-hidden">
+      <div class="px-4 py-3 border-b border-stone-200 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="newspaper" class="w-4 h-4 text-sky-600"></i>
+          <h3 class="display font-bold text-sm">ข่าวตลาดที่ดิน</h3>
+        </div>
+      </div>
+      <div id="newsList" class="divide-y divide-stone-100"></div>
+    </div>
+  </section>
+
+  <!-- ============ FILTERS ============ -->
+  <section class="card p-3">
+    <div class="flex flex-wrap items-center gap-2">
+      <button class="btn-secondary !py-2 !text-xs relative" onclick="toggleFilters()">
+        <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>ตัวกรอง
+        <span id="activeFilterDot" class="hidden active-dot"></span>
+      </button>
+
+      <select id="filterProvince" class="text-xs px-3 py-2 border border-stone-300 rounded-lg bg-white outline-none focus:border-brand-500" onchange="applyFilters()">
+        <option value="">📍 ทุกจังหวัด</option>
+      </select>
+
+      <select id="filterDeed" class="text-xs px-3 py-2 border border-stone-300 rounded-lg bg-white outline-none focus:border-brand-500" onchange="applyFilters()">
+        <option value="">📜 ทุกประเภทโฉนด</option>
+        <option value="โฉนด">โฉนด (น.ส.4)</option>
+        <option value="น.ส.3ก">น.ส.3ก</option>
+        <option value="น.ส.3">น.ส.3</option>
+        <option value="ส.ค.1">ส.ค.1</option>
+        <option value="ส.ป.ก.">ส.ป.ก.</option>
+      </select>
+
+      <select id="filterRoad" class="text-xs px-3 py-2 border border-stone-300 rounded-lg bg-white outline-none focus:border-brand-500" onchange="applyFilters()">
+        <option value="">🛣️ ทางเข้าออก</option>
+        <option value="ติดถนนใหญ่">ติดถนนใหญ่</option>
+        <option value="ติดถนนซอย">ติดถนนซอย</option>
+        <option value="ตาบอด">ตาบอด</option>
+      </select>
+
+      <select id="filterVerified" class="text-xs px-3 py-2 border border-stone-300 rounded-lg bg-white outline-none focus:border-brand-500" onchange="applyFilters()">
+        <option value="">🛡️ ทุกระดับยืนยัน</option>
+        <option value="3">✓ Verified Owner เท่านั้น</option>
+        <option value="2+">✓ ยืนยันตัวตนขึ้นไป</option>
+      </select>
+
+      <label class="inline-flex items-center gap-1.5 text-xs text-stone-600 px-2 py-1.5 cursor-pointer hover:bg-stone-50 rounded-lg" title="ที่ดินที่ต่างชาติถือครองได้ (ผ่านนิติบุคคล/leasehold)">
+        <input type="checkbox" id="filterForeigner" onchange="applyFilters()" class="rounded text-brand-600" />
+        🌍 Foreigner Eligible
+      </label>
+
+      <button class="btn-ghost !text-xs !py-1.5" onclick="openSavedSearchModal()" title="บันทึกการค้นหานี้">
+        <i data-lucide="bookmark-plus" class="w-3.5 h-3.5"></i>บันทึก
+      </button>
+
+      <select id="filterSort" class="text-xs px-3 py-2 border border-stone-300 rounded-lg bg-white outline-none focus:border-brand-500 ml-auto" onchange="applyFilters()">
+        <option value="newest">เรียง: ใหม่ล่าสุด</option>
+        <option value="ytd-desc">ราคาเพิ่มมากสุด (YTD)</option>
+        <option value="ytd-asc">ราคาลดมากสุด (YTD)</option>
+        <option value="price-asc">ราคาต่ำสุด</option>
+        <option value="price-desc">ราคาสูงสุด</option>
+        <option value="size-desc">ใหญ่สุด</option>
+        <option value="ppsw-asc">/ตร.ว. ต่ำสุด</option>
+      </select>
+
+      <div class="flex items-center bg-stone-100 rounded-lg p-1">
+        <button id="btnViewGrid" class="px-2 py-1.5 rounded text-xs font-medium" onclick="setView('grid')" title="Grid"><i data-lucide="layout-grid" class="w-4 h-4"></i></button>
+        <button id="btnViewTable" class="px-2 py-1.5 rounded text-xs font-medium" onclick="setView('table')" title="Table"><i data-lucide="list" class="w-4 h-4"></i></button>
+        <button id="btnViewMap" class="px-2 py-1.5 rounded text-xs font-medium" onclick="setView('map')" title="Map"><i data-lucide="map" class="w-4 h-4"></i></button>
+      </div>
+    </div>
+
+    <div id="advFilters" class="hidden mt-3 pt-3 border-t border-stone-200 grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div><label class="label !text-xs">ราคาต่ำสุด (บาท)</label><input id="filterPriceMin" type="number" class="input !py-1.5 !text-xs" oninput="applyFilters()" /></div>
+      <div><label class="label !text-xs">ราคาสูงสุด</label><input id="filterPriceMax" type="number" class="input !py-1.5 !text-xs" oninput="applyFilters()" /></div>
+      <div><label class="label !text-xs">ขนาดต่ำสุด (ไร่)</label><input id="filterSizeMin" type="number" class="input !py-1.5 !text-xs" oninput="applyFilters()" /></div>
+      <div><label class="label !text-xs">ราคา/ตร.ว. ต่ำสุด</label><input id="filterPpswMin" type="number" class="input !py-1.5 !text-xs" oninput="applyFilters()" /></div>
+      <div class="flex items-end"><button class="btn-ghost !text-xs w-full" onclick="resetFilters()"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>ล้าง</button></div>
+    </div>
+  </section>
+
+  <!-- ============ LISTINGS ============ -->
+  <section>
+    <div class="section-h">
+      <div>
+        <h2 class="display text-xl font-bold text-stone-900" id="resultsTitle">รายการทั้งหมด</h2>
+        <p class="text-xs text-stone-500" id="resultsCount">—</p>
+      </div>
+    </div>
+
+    <!-- Grid view -->
+    <div id="gridView" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+
+    <!-- Table view -->
+    <div id="tableView" class="hidden card overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-stone-50 text-stone-600 text-xs uppercase tracking-wider">
+          <tr>
+            <th class="text-left px-3 py-2">Symbol</th>
+            <th class="text-left px-3 py-2">ที่ตั้ง</th>
+            <th class="text-left px-3 py-2">โฉนด</th>
+            <th class="text-right px-3 py-2">ขนาด</th>
+            <th class="text-right px-3 py-2">฿/ตร.ว.</th>
+            <th class="text-right px-3 py-2">เทียบประเมิน</th>
+            <th class="text-right px-3 py-2">YTD</th>
+            <th class="text-right px-3 py-2">รวม</th>
+            <th class="px-3 py-2"></th>
+          </tr>
+        </thead>
+        <tbody id="tableBody" class="divide-y divide-stone-100"></tbody>
+      </table>
+    </div>
+
+    <!-- Map view -->
+    <div id="mapView" class="hidden">
+      <div id="mainMap" class="w-full h-[600px] rounded-xl border border-stone-200 overflow-hidden"></div>
+    </div>
+
+    <!-- Empty state -->
+    <div id="emptyState" class="hidden text-center py-16">
+      <div class="inline-flex w-14 h-14 rounded-full bg-stone-100 items-center justify-center mb-3"><i data-lucide="search-x" class="w-7 h-7 text-stone-400"></i></div>
+      <h3 class="display font-semibold text-stone-700">ไม่พบที่ดินตามเงื่อนไข</h3>
+      <button class="btn-secondary mt-3" onclick="resetFilters()">ล้างตัวกรอง</button>
+    </div>
+  </section>
+</main>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section class="bg-stone-50 py-12 md:py-16 border-y border-stone-200">
+  <div class="max-w-screen-2xl mx-auto px-4 sm:px-6">
+    <div class="text-center mb-10 max-w-2xl mx-auto">
+      <div class="inline-block px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-semibold mb-3">HOW IT WORKS</div>
+      <h2 class="display text-2xl md:text-3xl font-bold text-stone-900">ใช้งานง่ายใน 3 ขั้นตอน</h2>
+      <p class="text-stone-600 mt-2">จากค้นหาถึงติดต่อเจ้าของ — ใช้เวลาแค่ 5 นาที</p>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+      <div class="text-center relative">
+        <div class="step-num mx-auto mb-4">1</div>
+        <h3 class="display font-bold text-lg mb-2">🔍 ค้นหา + กรอง</h3>
+        <p class="text-sm text-stone-600 leading-relaxed">เลือกจังหวัด, ประเภทโฉนด, ราคา, ขนาด, ทางเข้าออก, ผังเมือง — เจอที่ดินที่ใช่ภายในวินาที</p>
+        <!-- Arrow -->
+        <i data-lucide="arrow-right" class="hidden md:block absolute top-7 -right-3 w-6 h-6 text-stone-300"></i>
+      </div>
+      <div class="text-center relative">
+        <div class="step-num mx-auto mb-4">2</div>
+        <h3 class="display font-bold text-lg mb-2">📊 ดูข้อมูลครบ</h3>
+        <p class="text-sm text-stone-600 leading-relaxed">ราคาตลาด, ราคาประเมินรัฐ, ประวัติซื้อขาย, ค่าโอน-ภาษี, ผังเมือง, แผนที่ — รวมในที่เดียว</p>
+        <i data-lucide="arrow-right" class="hidden md:block absolute top-7 -right-3 w-6 h-6 text-stone-300"></i>
+      </div>
+      <div class="text-center">
+        <div class="step-num mx-auto mb-4">3</div>
+        <h3 class="display font-bold text-lg mb-2">💬 ติดต่อ + ปิดดีล</h3>
+        <p class="text-sm text-stone-600 leading-relaxed">ส่งข้อความในเว็บ โทร หรือ LINE — เจ้าของ Verified Owner ตรวจตัวตนแล้ว ไม่มีนายหน้าซ่อนค่า</p>
+      </div>
+    </div>
+
+    <div class="text-center mt-10">
+      <button class="btn-primary !px-7 !py-3 !text-base hover:scale-105 transition shadow-xl shadow-brand-600/20" onclick="scrollToMarket()">
+        <i data-lucide="rocket" class="w-5 h-5"></i>เริ่มค้นหาที่ดิน
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TRUSTED BY / SOCIAL PROOF ============ -->
+<section class="bg-gradient-to-br from-brand-700 via-brand-600 to-emerald-700 text-white py-12 md:py-14 relative overflow-hidden">
+  <div class="blob" style="width:500px;height:500px;background:#fff;top:-200px;left:-100px;opacity:0.08"></div>
+  <div class="blob" style="width:400px;height:400px;background:#f59e0b;bottom:-150px;right:-100px;opacity:0.15"></div>
+
+  <div class="relative max-w-screen-2xl mx-auto px-4 sm:px-6">
+    <div class="text-center mb-8">
+      <h2 class="display text-2xl md:text-3xl font-bold">ตลาดที่ดินบนดินดี ณ วันนี้</h2>
+      <p class="text-emerald-100 mt-2 text-sm" id="liveTime">อัปเดต live</p>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+      <div class="text-center">
+        <div class="display text-4xl md:text-5xl font-extrabold count-anim" id="bigStat1">0</div>
+        <div class="text-sm opacity-90 mt-1">แปลงที่ดินทั้งหมด</div>
+      </div>
+      <div class="text-center">
+        <div class="display text-4xl md:text-5xl font-extrabold count-anim" id="bigStat2">0</div>
+        <div class="text-sm opacity-90 mt-1">จังหวัดครอบคลุม</div>
+      </div>
+      <div class="text-center">
+        <div class="display text-4xl md:text-5xl font-extrabold count-anim" id="bigStat3">0</div>
+        <div class="text-sm opacity-90 mt-1">ไร่รวม</div>
+      </div>
+      <div class="text-center">
+        <div class="display text-4xl md:text-5xl font-extrabold count-anim" id="bigStat4">0</div>
+        <div class="text-sm opacity-90 mt-1">Verified Owner</div>
+      </div>
+    </div>
+
+    <div class="mt-10 text-center">
+      <div class="text-xs text-emerald-100 mb-3">ตรวจสอบและเชื่อมโยงข้อมูลจากแหล่งราชการ</div>
+      <div class="flex flex-wrap items-center justify-center gap-3 md:gap-5 opacity-90">
+        <div class="bg-white/10 backdrop-blur border border-white/20 rounded-lg px-4 py-2 text-sm font-semibold">🛡️ ThaID</div>
+        <div class="bg-white/10 backdrop-blur border border-white/20 rounded-lg px-4 py-2 text-sm font-semibold">🏛️ กรมที่ดิน LandsMaps</div>
+        <div class="bg-white/10 backdrop-blur border border-white/20 rounded-lg px-4 py-2 text-sm font-semibold">💰 กรมธนารักษ์</div>
+        <div class="bg-white/10 backdrop-blur border border-white/20 rounded-lg px-4 py-2 text-sm font-semibold">🎨 กรมโยธาฯ ผังเมือง</div>
+        <div class="bg-white/10 backdrop-blur border border-white/20 rounded-lg px-4 py-2 text-sm font-semibold">🔐 NDID</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TESTIMONIAL / USE CASES ============ -->
+<section class="bg-white py-12 md:py-16">
+  <div class="max-w-screen-2xl mx-auto px-4 sm:px-6">
+    <div class="text-center mb-10 max-w-2xl mx-auto">
+      <div class="inline-block px-3 py-1 bg-sky-100 text-sky-800 rounded-full text-xs font-semibold mb-3">USE CASES</div>
+      <h2 class="display text-2xl md:text-3xl font-bold text-stone-900">ดินดี เหมาะกับใคร?</h2>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-5 max-w-5xl mx-auto">
+      <div class="card p-5 lift bg-gradient-to-br from-emerald-50 to-white">
+        <div class="text-4xl mb-3">🏡</div>
+        <h3 class="display font-bold text-base mb-1">ผู้ซื้อบ้านพักผ่อน</h3>
+        <p class="text-sm text-stone-600 leading-relaxed mb-3">"อยากซื้อที่เขาใหญ่/หัวหิน แต่กลัวโดนหลอก ที่นี่มี Verified Owner + ดูราคาเทียบเคียงได้"</p>
+        <div class="text-xs text-stone-500">💡 ใช้ตรวจ deed + ราคาเฉลี่ยพื้นที่</div>
+      </div>
+      <div class="card p-5 lift bg-gradient-to-br from-amber-50 to-white">
+        <div class="text-4xl mb-3">🌾</div>
+        <h3 class="display font-bold text-base mb-1">นักลงทุนที่ดิน</h3>
+        <p class="text-sm text-stone-600 leading-relaxed mb-3">"ดูเทรนด์ราคาย้อนหลังเหมือนหุ้น — เห็น CAGR 5-15%/ปี ที่ดินคือ asset อันดับ 1"</p>
+        <div class="text-xs text-stone-500">💡 ใช้ price history + comparable</div>
+      </div>
+      <div class="card p-5 lift bg-gradient-to-br from-sky-50 to-white">
+        <div class="text-4xl mb-3">🚜</div>
+        <h3 class="display font-bold text-base mb-1">เกษตรกร / Developer</h3>
+        <p class="text-sm text-stone-600 leading-relaxed mb-3">"กรองที่ดินตามผังเมือง + ทางเข้าออก + ขนาด — เจอแปลงที่ใช่ได้ใน 10 นาที"</p>
+        <div class="text-xs text-stone-500">💡 ใช้ filter ผังเมือง + zoning</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FINAL CTA ============ -->
+<section class="bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 py-14 md:py-20 relative overflow-hidden">
+  <div class="blob" style="width:400px;height:400px;background:#f59e0b;top:-100px;right:10%;opacity:0.2"></div>
+  <div class="relative max-w-3xl mx-auto px-4 sm:px-6 text-center">
+    <div class="text-5xl md:text-6xl mb-4">🌱</div>
+    <h2 class="display text-3xl md:text-4xl font-extrabold text-stone-900 mb-3">มีที่ดินอยากขาย?</h2>
+    <p class="text-base md:text-lg text-stone-700 max-w-xl mx-auto mb-7">
+      ลงประกาศ <strong>ฟรี</strong> ไม่มีค่านายหน้า ไม่มีค่าธรรมเนียม<br/>
+      ผู้ซื้อทุกคน Verified ผ่าน ThaID — ปลอดภัย ตรงตัว
+    </p>
+    <button class="btn-primary !px-8 !py-4 !text-lg shadow-2xl shadow-amber-500/30 hover:scale-105 transition" onclick="openAddModal()">
+      <i data-lucide="plus-circle" class="w-6 h-6"></i>ลงประกาศที่ดินฟรี →
+    </button>
+    <div class="mt-5 flex flex-wrap justify-center gap-4 text-xs text-stone-600">
+      <span>✓ ใช้เวลา 5 นาที</span>
+      <span>✓ เห็นบนเว็บทันที</span>
+      <span>✓ ผู้ซื้อติดต่อตรง</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="bg-ink-900 text-stone-400 mt-10">
+  <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 py-8 text-xs">
+    <div class="flex flex-col md:flex-row justify-between gap-4">
+      <div>
+        <div class="display font-bold text-white text-sm mb-1">ดินดี Terminal v0.3.0 — Trust Edition</div>
+        <div>ข้อมูลราคาประเมินจากกรมธนารักษ์ ผังเมืองจากกรมโยธาธิการ ข้อมูลแปลงเป็นข้อมูลเบื้องต้น</div>
+      </div>
+      <div>
+        <div class="text-white font-semibold mb-2">Disclaimer</div>
+        <div class="max-w-md">ข้อมูลในระบบเป็นข้อมูลประกาศและประมาณการเพื่อการศึกษา ไม่ใช่หลักฐานทางกฎหมาย โปรดตรวจสอบที่สำนักงานที่ดินก่อนตัดสินใจซื้อขาย</div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- ============ DETAIL VIEW (Trading Terminal Style) ============ -->
+<div id="detailView" class="hidden fixed inset-0 z-50 bg-stone-50 overflow-y-auto">
+  <!-- Top bar -->
+  <div class="bg-white border-b border-stone-200 sticky top-0 z-20">
+    <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+      <button class="btn-ghost" onclick="closeDetailView()">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i> กลับ
+      </button>
+      <div class="flex items-center gap-2 flex-wrap">
+        <button id="compareBtn" class="btn-secondary !py-2 !text-xs" onclick="addToCompare(currentDetailId)" title="เพิ่มเปรียบเทียบ">
+          <i data-lucide="git-compare" class="w-4 h-4"></i><span class="hidden sm:inline">เปรียบเทียบ</span>
+        </button>
+        <button id="watchBtn" class="btn-secondary !py-2 !text-xs" onclick="toggleWatchlist(currentDetailId)">
+          <i data-lucide="star" class="w-4 h-4"></i>
+          <span id="watchBtnLabel" class="hidden sm:inline">รายการสนใจ</span>
+        </button>
+        <button class="btn-secondary !py-2 !text-xs" onclick="openShareModal(currentDetailId)">
+          <i data-lucide="share-2" class="w-4 h-4"></i><span class="hidden sm:inline">แชร์</span>
+        </button>
+        <button class="btn-secondary !py-2 !text-xs !text-rose-600 !border-rose-200 hover:!bg-rose-50" onclick="openReportModal(currentDetailId)" title="รายงานประกาศนี้">
+          <i data-lucide="flag" class="w-4 h-4"></i><span class="hidden sm:inline">รายงาน</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 py-5" id="detailContent"></div>
+</div>
+
+<!-- ============ ADD LISTING MODAL ============ -->
+<div id="addModal" class="hidden fixed inset-0 z-50 modal-backdrop overflow-y-auto">
+  <div class="min-h-screen flex items-start justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-4xl w-full my-8 shadow-2xl overflow-hidden fade-in">
+      <div class="flex items-center justify-between p-4 border-b border-stone-200 sticky top-0 bg-white z-10">
+        <div>
+          <h2 class="display font-bold text-lg">ลงประกาศที่ดินฟรี</h2>
+          <p class="text-xs text-stone-500">ฟรี ไม่มีค่าธรรมเนียม ไม่มีค่านายหน้า — ลงเสร็จเห็นทันที</p>
+        </div>
+        <button class="btn-ghost" onclick="closeAddModal()"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <!-- Verification gate -->
+      <div id="addVerifyGate" class="p-5 border-b border-stone-200"></div>
+
+      <form id="addForm" class="p-6 space-y-6" onsubmit="submitListing(event)">
+        <section>
+          <div class="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">1. ตำแหน่งที่ดิน <span class="text-rose-500">*</span></div>
+          <div class="grid md:grid-cols-3 gap-3 mb-3">
+            <div><label class="label">จังหวัด</label><select id="newProvince" class="input" required><option value="">เลือก</option></select></div>
+            <div><label class="label">อำเภอ</label><input type="text" id="newDistrict" class="input" required /></div>
+            <div><label class="label">ตำบล</label><input type="text" id="newSubdistrict" class="input" /></div>
+          </div>
+          <label class="label">📍 คลิกบนแผนที่เพื่อปักหมุด</label>
+          <div id="newMap" class="w-full h-56 rounded-lg border border-stone-300 overflow-hidden"></div>
+          <div class="mt-2 text-xs text-stone-500" id="newCoords">ยังไม่ได้ปักหมุด</div>
+        </section>
+
+        <section>
+          <div class="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">2. เอกสารสิทธิ์</div>
+          <div class="grid md:grid-cols-2 gap-3">
+            <div><label class="label">ประเภท</label>
+              <select id="newDeedType" class="input" required>
+                <option value="โฉนด">โฉนด (น.ส.4)</option>
+                <option value="น.ส.3ก">น.ส.3ก</option>
+                <option value="น.ส.3">น.ส.3</option>
+                <option value="ส.ค.1">ส.ค.1</option>
+                <option value="ส.ป.ก.">ส.ป.ก.</option>
+              </select>
+            </div>
+            <div><label class="label">เลขที่</label><input type="text" id="newDeedNumber" class="input" /></div>
+          </div>
+        </section>
+
+        <section>
+          <div class="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">3. ขนาด</div>
+          <div class="grid grid-cols-3 gap-3">
+            <div><label class="label">ไร่</label><input type="number" id="newRai" class="input" min="0" oninput="updateAreaCalc()" /></div>
+            <div><label class="label">งาน</label><input type="number" id="newNgan" class="input" min="0" max="3" oninput="updateAreaCalc()" /></div>
+            <div><label class="label">ตร.ว.</label><input type="number" id="newSqWah" class="input" min="0" max="99" oninput="updateAreaCalc()" /></div>
+          </div>
+          <div class="mt-2 text-sm bg-stone-50 rounded-lg p-3" id="areaTotal">รวม: <span class="font-semibold">0 ตร.ว.</span></div>
+        </section>
+
+        <section>
+          <div class="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">4. ราคา</div>
+          <div class="grid md:grid-cols-2 gap-3">
+            <div><label class="label">บาท/ตร.ว.</label><input type="number" id="newPricePerSqWah" class="input" oninput="updatePriceCalc()" /></div>
+            <div><label class="label">รวม (อัตโนมัติ)</label><div id="priceTotal" class="input bg-stone-50 font-semibold text-brand-700">฿ 0</div></div>
+          </div>
+        </section>
+
+        <section>
+          <div class="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">5. ลักษณะ</div>
+          <div class="grid md:grid-cols-3 gap-3 mb-3">
+            <div><label class="label">หน้ากว้าง (ม.)</label><input type="number" id="newWidth" class="input" /></div>
+            <div><label class="label">ลึก (ม.)</label><input type="number" id="newDepth" class="input" /></div>
+            <div><label class="label">ทางเข้าออก</label>
+              <select id="newRoadAccess" class="input">
+                <option value="ติดถนนใหญ่">ติดถนนใหญ่</option>
+                <option value="ติดถนนซอย">ติดถนนซอย</option>
+                <option value="ตาบอด">ตาบอด</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid md:grid-cols-2 gap-3">
+            <div><label class="label">ประเภทการใช้</label>
+              <select id="newUseType" class="input">
+                <option>ที่อยู่อาศัย</option><option>เกษตรกรรม</option>
+                <option>พาณิชย์</option><option>อุตสาหกรรม</option>
+                <option>โครงการ</option><option>อเนกประสงค์</option>
+              </select>
+            </div>
+            <div><label class="label">สาธารณูปโภค</label>
+              <div class="flex flex-wrap gap-3 pt-1 text-sm">
+                <label class="inline-flex gap-1"><input type="checkbox" value="น้ำประปา" class="util-cb" />น้ำประปา</label>
+                <label class="inline-flex gap-1"><input type="checkbox" value="ไฟฟ้า" class="util-cb" />ไฟฟ้า</label>
+                <label class="inline-flex gap-1"><input type="checkbox" value="อินเทอร์เน็ต" class="util-cb" />อินเทอร์เน็ต</label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <div class="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">6. รูปภาพ</div>
+          <label for="newPhotos" class="block border-2 border-dashed border-stone-300 rounded-xl p-5 text-center cursor-pointer hover:border-brand-500 hover:bg-brand-50 transition">
+            <i data-lucide="upload-cloud" class="w-8 h-8 text-stone-400 mx-auto mb-2"></i>
+            <div class="text-sm font-medium">คลิกอัปโหลด (สูงสุด 5 รูป)</div>
+            <input id="newPhotos" type="file" multiple accept="image/*" class="hidden" onchange="handlePhotoUpload(event)" />
+          </label>
+          <div id="photoPreview" class="mt-3 grid grid-cols-5 gap-2"></div>
+        </section>
+
+        <section>
+          <div class="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">7. คำอธิบาย</div>
+          <textarea id="newDescription" rows="3" class="input" placeholder="รายละเอียดที่ดิน..."></textarea>
+        </section>
+
+        <section>
+          <div class="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">8. ข้อมูลผู้ขาย <span class="text-rose-500">*</span></div>
+          <div class="grid md:grid-cols-3 gap-3">
+            <div><label class="label">ชื่อ-นามสกุล</label><input type="text" id="newOwnerName" class="input" required /></div>
+            <div><label class="label">เบอร์โทร</label><input type="tel" id="newOwnerPhone" class="input" required /></div>
+            <div><label class="label">Line ID</label><input type="text" id="newOwnerLine" class="input" /></div>
+          </div>
+          <label class="inline-flex items-start gap-2 mt-3 text-sm text-stone-600">
+            <input type="checkbox" id="newAgree" required class="mt-1" />
+            <span>ยืนยันว่าข้อมูลถูกต้อง และเป็นเจ้าของหรือได้รับมอบหมายให้ขายที่ดินแปลงนี้</span>
+          </label>
+        </section>
+
+        <div class="flex items-center justify-between pt-4 border-t border-stone-200">
+          <button type="button" class="btn-ghost" onclick="closeAddModal()">ยกเลิก</button>
+          <button type="submit" class="btn-primary !px-8"><i data-lucide="check-circle" class="w-4 h-4"></i>ลงประกาศ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ============ WATCHLIST DRAWER ============ -->
+<div id="watchlistOverlay" class="hidden fixed inset-0 z-40 bg-black/40" onclick="closeWatchlist()"></div>
+<aside id="watchlistDrawer" class="drawer fixed right-0 top-0 bottom-0 w-full max-w-md bg-white z-50 shadow-2xl flex flex-col">
+  <div class="p-4 border-b border-stone-200 flex items-center justify-between">
+    <div>
+      <h2 class="display font-bold text-lg flex items-center gap-2"><i data-lucide="star" class="w-5 h-5 text-amber-500"></i>รายการสนใจ</h2>
+      <p class="text-xs text-stone-500">ติดตามที่ดินที่คุณสนใจ ดูราคาเปลี่ยนแปลงได้</p>
+    </div>
+    <button class="btn-ghost" onclick="closeWatchlist()"><i data-lucide="x" class="w-5 h-5"></i></button>
+  </div>
+  <div id="watchlistBody" class="flex-1 overflow-y-auto p-4"></div>
+</aside>
+
+<!-- ============ COMPARE FLOATING BAR ============ -->
+<div id="compareBar" class="compare-bar fixed bottom-0 left-0 right-0 bg-white border-t-2 border-brand-500 shadow-2xl z-40 px-4 py-3">
+  <div class="max-w-screen-2xl mx-auto flex items-center justify-between gap-3 flex-wrap">
+    <div class="flex items-center gap-2 flex-wrap" id="compareThumbs"></div>
+    <div class="flex items-center gap-2">
+      <button class="btn-ghost !text-xs" onclick="clearCompare()">ล้างทั้งหมด</button>
+      <button class="btn-primary" onclick="openCompareModal()"><i data-lucide="git-compare" class="w-4 h-4"></i>เปรียบเทียบ (<span id="compareCount">0</span>)</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ VERIFY (ThaID) MODAL ============ -->
+<div id="verifyModal" class="hidden fixed inset-0 z-[60] modal-backdrop overflow-y-auto">
+  <div class="min-h-screen flex items-start justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full my-8 shadow-2xl overflow-hidden fade-in">
+      <div class="flex items-center justify-between p-4 border-b border-stone-200">
+        <h2 class="display font-bold text-lg flex items-center gap-2"><span class="text-2xl">🛡️</span>ระบบยืนยันตัวตน</h2>
+        <button class="btn-ghost" onclick="closeVerifyModal()"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div id="verifyBody" class="p-6"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ COMPARE MODAL ============ -->
+<div id="compareModal" class="hidden fixed inset-0 z-[60] modal-backdrop overflow-y-auto">
+  <div class="min-h-screen p-4">
+    <div class="bg-white rounded-2xl w-full max-w-7xl mx-auto my-4 shadow-2xl overflow-hidden fade-in">
+      <div class="flex items-center justify-between p-4 border-b border-stone-200 sticky top-0 bg-white z-10">
+        <h2 class="display font-bold text-lg">เปรียบเทียบที่ดิน</h2>
+        <button class="btn-ghost" onclick="closeCompareModal()"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div id="compareBody" class="p-4 overflow-x-auto"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ CHAT MODAL ============ -->
+<div id="chatModal" class="hidden fixed inset-0 z-[60] modal-backdrop overflow-y-auto">
+  <div class="min-h-screen flex items-end sm:items-center justify-center sm:p-4">
+    <div class="bg-white sm:rounded-2xl w-full max-w-md h-[90vh] sm:h-[70vh] shadow-2xl overflow-hidden fade-in flex flex-col">
+      <div id="chatHeader" class="p-4 border-b border-stone-200 flex items-center justify-between bg-gradient-to-r from-brand-50 to-white"></div>
+      <div id="chatThread" class="flex-1 overflow-y-auto p-4 space-y-3"></div>
+      <div class="p-3 border-t border-stone-200 bg-stone-50">
+        <div class="flex gap-2">
+          <input id="chatInput" type="text" placeholder="พิมพ์ข้อความ..." class="input !py-2" onkeypress="if(event.key==='Enter')sendChat()" />
+          <button class="btn-primary !py-2" onclick="sendChat()"><i data-lucide="send" class="w-4 h-4"></i></button>
+        </div>
+        <div class="flex gap-2 mt-2 text-[10px] text-stone-500">
+          <button class="hover:text-brand-600" onclick="quickChat('สนใจที่ดินแปลงนี้ครับ ขอข้อมูลเพิ่มเติม')">💬 ขอข้อมูล</button>
+          <button class="hover:text-brand-600" onclick="quickChat('ขอนัดดูสถานที่จริงได้ไหมครับ?')">📅 ขอนัดดู</button>
+          <button class="hover:text-brand-600" onclick="quickChat('ราคาต่อรองได้ไหมครับ?')">💰 ต่อรอง</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ REPORT MODAL ============ -->
+<div id="reportModal" class="hidden fixed inset-0 z-[60] modal-backdrop overflow-y-auto">
+  <div class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden fade-in">
+      <div class="flex items-center justify-between p-4 border-b border-stone-200">
+        <h2 class="display font-bold text-base flex items-center gap-2"><i data-lucide="flag" class="w-5 h-5 text-rose-600"></i>รายงานประกาศ</h2>
+        <button class="btn-ghost" onclick="closeReportModal()"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="p-5 space-y-3 text-sm">
+        <p class="text-stone-600">ช่วยเราดูแลคุณภาพประกาศ — เลือกเหตุผล</p>
+        <div class="space-y-2" id="reportReasons">
+          ${''}
+          <label class="flex items-start gap-2 p-2.5 border border-stone-200 rounded-lg hover:bg-stone-50 cursor-pointer"><input type="radio" name="reportReason" value="ราคาผิดปกติ / suspicious" class="mt-0.5" /><div><div class="font-medium">ราคาผิดปกติ / Suspicious Price</div><div class="text-xs text-stone-500">ราคาต่ำหรือสูงผิดปกติเมื่อเทียบกับตลาด</div></div></label>
+          <label class="flex items-start gap-2 p-2.5 border border-stone-200 rounded-lg hover:bg-stone-50 cursor-pointer"><input type="radio" name="reportReason" value="รูปไม่ตรงปก" class="mt-0.5" /><div><div class="font-medium">รูปไม่ตรงปก / Stolen Photos</div><div class="text-xs text-stone-500">รูปจากเว็บอื่น ไม่ใช่ที่ดินจริง</div></div></label>
+          <label class="flex items-start gap-2 p-2.5 border border-stone-200 rounded-lg hover:bg-stone-50 cursor-pointer"><input type="radio" name="reportReason" value="เจ้าของไม่ใช่คนลง" class="mt-0.5" /><div><div class="font-medium">เจ้าของไม่ใช่คนลง / Impersonation</div><div class="text-xs text-stone-500">ผู้ลงประกาศไม่ใช่เจ้าของที่ดินแปลงนี้</div></div></label>
+          <label class="flex items-start gap-2 p-2.5 border border-stone-200 rounded-lg hover:bg-stone-50 cursor-pointer"><input type="radio" name="reportReason" value="ที่ดินไม่มีอยู่จริง" class="mt-0.5" /><div><div class="font-medium">ที่ดินไม่มีอยู่จริง / Fake Plot</div><div class="text-xs text-stone-500">ตำแหน่ง/เลขโฉนดไม่ตรงกับความจริง</div></div></label>
+          <label class="flex items-start gap-2 p-2.5 border border-stone-200 rounded-lg hover:bg-stone-50 cursor-pointer"><input type="radio" name="reportReason" value="ขอมัดจำก่อนดู" class="mt-0.5" /><div><div class="font-medium">ขอมัดจำก่อนดู / Payment Fraud</div><div class="text-xs text-stone-500">บังคับให้โอนเงินก่อนเห็นที่ดิน</div></div></label>
+          <label class="flex items-start gap-2 p-2.5 border border-stone-200 rounded-lg hover:bg-stone-50 cursor-pointer"><input type="radio" name="reportReason" value="ประกาศซ้ำซ้อน" class="mt-0.5" /><div><div class="font-medium">ประกาศซ้ำซ้อน / Duplicate</div><div class="text-xs text-stone-500">มีประกาศที่ดินแปลงเดียวกันอยู่แล้ว</div></div></label>
+          <label class="flex items-start gap-2 p-2.5 border border-stone-200 rounded-lg hover:bg-stone-50 cursor-pointer"><input type="radio" name="reportReason" value="ขายแล้ว" class="mt-0.5" /><div><div class="font-medium">ขายไปแล้ว / Already Sold</div><div class="text-xs text-stone-500">ที่ดินขายแล้วแต่ยังไม่ลบประกาศ</div></div></label>
+          <label class="flex items-start gap-2 p-2.5 border border-stone-200 rounded-lg hover:bg-stone-50 cursor-pointer"><input type="radio" name="reportReason" value="ข้อมูลโฉนดไม่ถูก" class="mt-0.5" /><div><div class="font-medium">ข้อมูลโฉนดไม่ถูก</div><div class="text-xs text-stone-500">เลขโฉนด/ประเภทไม่ตรงกับเอกสารจริง</div></div></label>
+          <label class="flex items-start gap-2 p-2.5 border border-stone-200 rounded-lg hover:bg-stone-50 cursor-pointer"><input type="radio" name="reportReason" value="อื่นๆ" class="mt-0.5" /><div><div class="font-medium">อื่นๆ</div></div></label>
+        </div>
+        <textarea id="reportDetail" rows="3" class="input" placeholder="รายละเอียดเพิ่มเติม (ไม่บังคับ)"></textarea>
+        <div class="flex gap-2 pt-2">
+          <button class="btn-ghost flex-1" onclick="closeReportModal()">ยกเลิก</button>
+          <button class="btn-primary flex-1 !bg-rose-600 hover:!bg-rose-700" onclick="submitReport()">ส่งรายงาน</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SHARE MODAL ============ -->
+<div id="shareModal" class="hidden fixed inset-0 z-[60] modal-backdrop overflow-y-auto">
+  <div class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden fade-in">
+      <div class="flex items-center justify-between p-4 border-b border-stone-200">
+        <h2 class="display font-bold text-base">แชร์ประกาศ</h2>
+        <button class="btn-ghost" onclick="closeShareModal()"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="p-5">
+        <div id="shareInfo" class="bg-stone-50 rounded-lg p-3 mb-4 text-sm"></div>
+        <div class="grid grid-cols-4 gap-2 mb-4">
+          <button class="flex flex-col items-center gap-1 p-3 hover:bg-stone-50 rounded-lg" onclick="shareTo('line')"><div class="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center text-white text-xl font-bold">L</div><span class="text-xs">LINE</span></button>
+          <button class="flex flex-col items-center gap-1 p-3 hover:bg-stone-50 rounded-lg" onclick="shareTo('fb')"><div class="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white text-xl font-bold">f</div><span class="text-xs">Facebook</span></button>
+          <button class="flex flex-col items-center gap-1 p-3 hover:bg-stone-50 rounded-lg" onclick="shareTo('twitter')"><div class="w-12 h-12 rounded-full bg-stone-900 flex items-center justify-center text-white text-xl font-bold">𝕏</div><span class="text-xs">X</span></button>
+          <button class="flex flex-col items-center gap-1 p-3 hover:bg-stone-50 rounded-lg" onclick="shareTo('whatsapp')"><div class="w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center text-white"><i data-lucide="message-circle" class="w-6 h-6"></i></div><span class="text-xs">WhatsApp</span></button>
+        </div>
+        <div class="flex gap-2">
+          <input id="shareLink" type="text" readonly class="input mono !text-xs" />
+          <button class="btn-secondary" onclick="copyShareLink()"><i data-lucide="copy" class="w-4 h-4"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SAVED SEARCH MODAL ============ -->
+<div id="savedSearchModal" class="hidden fixed inset-0 z-[60] modal-backdrop overflow-y-auto">
+  <div class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden fade-in">
+      <div class="flex items-center justify-between p-4 border-b border-stone-200">
+        <h2 class="display font-bold text-base flex items-center gap-2"><i data-lucide="bell-plus" class="w-5 h-5 text-amber-600"></i>บันทึก + รับแจ้งเตือน</h2>
+        <button class="btn-ghost" onclick="closeSavedSearchModal()"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="p-5 space-y-3">
+        <p class="text-sm text-stone-600">บันทึกการค้นหานี้ — เมื่อมีที่ดินใหม่ตรงเงื่อนไข เราจะแจ้งให้ทราบ</p>
+        <div id="savedSearchSummary" class="bg-stone-50 rounded-lg p-3 text-sm text-stone-700"></div>
+        <div>
+          <label class="label">ตั้งชื่อการค้นหา</label>
+          <input id="savedSearchName" type="text" class="input" placeholder="เช่น ที่ดินภูเก็ตวิวทะเล" />
+        </div>
+        <div>
+          <label class="label">ความถี่การแจ้งเตือน</label>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="border border-stone-300 rounded-lg p-2.5 text-center cursor-pointer hover:bg-brand-50 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50"><input type="radio" name="alertFreq" value="instant" class="hidden" /><div class="text-xs font-medium">⚡ ทันที</div></label>
+            <label class="border border-stone-300 rounded-lg p-2.5 text-center cursor-pointer hover:bg-brand-50 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50"><input type="radio" name="alertFreq" value="daily" checked class="hidden" /><div class="text-xs font-medium">📅 รายวัน</div></label>
+            <label class="border border-stone-300 rounded-lg p-2.5 text-center cursor-pointer hover:bg-brand-50 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50"><input type="radio" name="alertFreq" value="weekly" class="hidden" /><div class="text-xs font-medium">🗓️ รายสัปดาห์</div></label>
+          </div>
+        </div>
+        <div>
+          <label class="label">รับแจ้งทาง</label>
+          <div class="space-y-1.5 text-sm">
+            <label class="flex items-center gap-2"><input type="checkbox" id="alertInApp" checked /> 🔔 ในเว็บ</label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="alertEmail" /> 📧 อีเมล</label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="alertLine" /> 💬 LINE Notify</label>
+          </div>
+        </div>
+        <div class="flex gap-2 pt-2">
+          <button class="btn-ghost flex-1" onclick="closeSavedSearchModal()">ยกเลิก</button>
+          <button class="btn-primary flex-1" onclick="saveCurrentSearch()">บันทึก</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MY LISTINGS / DASHBOARD MODAL ============ -->
+<div id="dashboardModal" class="hidden fixed inset-0 z-[60] modal-backdrop overflow-y-auto">
+  <div class="min-h-screen p-4">
+    <div class="bg-white rounded-2xl w-full max-w-5xl mx-auto my-4 shadow-2xl overflow-hidden fade-in">
+      <div class="flex items-center justify-between p-4 border-b border-stone-200 sticky top-0 bg-white z-10">
+        <h2 class="display font-bold text-lg">บัญชีของฉัน</h2>
+        <button class="btn-ghost" onclick="closeDashboard()"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="border-b border-stone-200 px-4 flex overflow-x-auto scrollbar-hide">
+        <button class="tab-btn active" data-dtab="profile" onclick="setDashTab('profile')">โปรไฟล์ + ยืนยันตัวตน</button>
+        <button class="tab-btn" data-dtab="mylistings" onclick="setDashTab('mylistings')">ประกาศของฉัน</button>
+        <button class="tab-btn" data-dtab="inquiries" onclick="setDashTab('inquiries')">คำถามที่ได้รับ</button>
+        <button class="tab-btn" data-dtab="searches" onclick="setDashTab('searches')">การค้นหาที่บันทึก</button>
+        <button class="tab-btn" data-dtab="watched" onclick="setDashTab('watched')">รายการสนใจ</button>
+      </div>
+      <div id="dashboardBody" class="p-5"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DUPLICATE WARNING MODAL ============ -->
+<div id="dupModal" class="hidden fixed inset-0 z-[70] modal-backdrop overflow-y-auto">
+  <div class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden fade-in">
+      <div class="bg-rose-50 border-b border-rose-200 p-4 flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center"><i data-lucide="alert-triangle" class="w-5 h-5 text-rose-600"></i></div>
+        <div>
+          <h2 class="display font-bold text-base text-rose-900">พบประกาศซ้ำซ้อน</h2>
+          <p class="text-xs text-rose-700">ที่ดินแปลงนี้ดูเหมือนมีอยู่ในระบบแล้ว</p>
+        </div>
+      </div>
+      <div id="dupBody" class="p-5"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-stone-900 text-white px-5 py-3 rounded-xl shadow-xl text-sm font-medium"></div>
+
+<script>
+// ============================================
+// PROVINCE DATA + CODES
+// ============================================
+const PROVINCES = ["กรุงเทพมหานคร","กระบี่","กาญจนบุรี","กาฬสินธุ์","กำแพงเพชร","ขอนแก่น","จันทบุรี","ฉะเชิงเทรา","ชลบุรี","ชัยนาท","ชัยภูมิ","ชุมพร","เชียงราย","เชียงใหม่","ตรัง","ตราด","ตาก","นครนายก","นครปฐม","นครพนม","นครราชสีมา","นครศรีธรรมราช","นครสวรรค์","นนทบุรี","นราธิวาส","น่าน","บึงกาฬ","บุรีรัมย์","ปทุมธานี","ประจวบคีรีขันธ์","ปราจีนบุรี","ปัตตานี","พระนครศรีอยุธยา","พะเยา","พังงา","พัทลุง","พิจิตร","พิษณุโลก","เพชรบุรี","เพชรบูรณ์","แพร่","ภูเก็ต","มหาสารคาม","มุกดาหาร","แม่ฮ่องสอน","ยโสธร","ยะลา","ร้อยเอ็ด","ระนอง","ระยอง","ราชบุรี","ลพบุรี","ลำปาง","ลำพูน","เลย","ศรีสะเกษ","สกลนคร","สงขลา","สตูล","สมุทรปราการ","สมุทรสงคราม","สมุทรสาคร","สระแก้ว","สระบุรี","สิงห์บุรี","สุโขทัย","สุพรรณบุรี","สุราษฎร์ธานี","สุรินทร์","หนองคาย","หนองบัวลำภู","อ่างทอง","อำนาจเจริญ","อุดรธานี","อุตรดิตถ์","อุทัยธานี","อุบลราชธานี"];
+
+const PROVINCE_CODE = {
+  "กรุงเทพมหานคร":"BKK","ชลบุรี":"CHO","นครราชสีมา":"NMA","เชียงใหม่":"CMI","เชียงราย":"CRI",
+  "ประจวบคีรีขันธ์":"PKK","สุราษฎร์ธานี":"SUR","ปราจีนบุรี":"PRI","ระยอง":"RYG","พระนครศรีอยุธยา":"AYA",
+  "ภูเก็ต":"HKT","กระบี่":"KBI","ขอนแก่น":"KKN","พิษณุโลก":"PLK","เพชรบุรี":"PBI",
+  "ฉะเชิงเทรา":"CCO","นครปฐม":"NPT","นนทบุรี":"NBI","ปทุมธานี":"PTE","สมุทรปราการ":"SPK",
+  "สมุทรสาคร":"SKN","อุบลราชธานี":"UBN","อุดรธานี":"UDN","สงขลา":"SKA","หาดใหญ่":"HDY",
+  "ลำปาง":"LPG","ลำพูน":"LPN","สุโขทัย":"STI","ตาก":"TAK","แม่ฮ่องสอน":"MHS",
+};
+function provCode(p) { return PROVINCE_CODE[p] || (p ? p.slice(0,2).toUpperCase() : 'XXX'); }
+
+const STORAGE_KEY = 'dindee_listings_v2';
+const WATCH_KEY = 'dindee_watchlist_v1';
+const USER_KEY = 'dindee_user_v1';
+const RECENT_KEY = 'dindee_recent_v1';
+const COMPARE_KEY = 'dindee_compare_v1';
+const SAVED_SEARCH_KEY = 'dindee_savedsearches_v1';
+const CHATS_KEY = 'dindee_chats_v1';
+const REPORTS_KEY = 'dindee_reports_v1';
+
+// ============================================
+// SEED DATA
+// ============================================
+const SEED = [
+  {id:'L001',title:'ที่ดินติดถนนใหญ่ บ่อวิน ใกล้นิคมอมตะ',province:'ชลบุรี',district:'ศรีราชา',subdistrict:'บ่อวิน',deedType:'โฉนด',deedNumber:'12345',rai:5,ngan:2,sqWah:50,pricePerSqWah:25000,width:50,depth:80,roadAccess:'ติดถนนใหญ่',useType:'อุตสาหกรรม',utilities:['น้ำประปา','ไฟฟ้า','อินเทอร์เน็ต'],description:'ที่ดินติดถนน 4 เลน เหมาะทำโครงการ ใกล้นิคมอุตสาหกรรมอมตะซิตี้ ระยะ 2 กม. น้ำไฟพร้อม',photos:['https://picsum.photos/seed/land1/800/600'],lat:13.0830,lng:101.0500,govPricePerSqWah:18000,zone:'สีม่วง',ownerName:'คุณสมชาย ใจดี',ownerPhone:'081-234-5678',verified:true,postedAt:Date.now()-86400000*2,views:234,priceStart:18000},
+  {id:'L002',title:'ที่ดินเกษตร 30 ไร่ ปากช่อง วิวเขา',province:'นครราชสีมา',district:'ปากช่อง',subdistrict:'หมูสี',deedType:'น.ส.3ก',deedNumber:'5678',rai:30,ngan:0,sqWah:0,pricePerSqWah:4500,width:200,depth:600,roadAccess:'ติดถนนซอย',useType:'เกษตรกรรม',utilities:['ไฟฟ้า'],description:'ที่ดินเกษตร 30 ไร่ ติดถนนซอย วิวภูเขา เหมาะทำรีสอร์ท ไร่องุ่น น้ำธรรมชาติผ่าน อยู่ใกล้เขาใหญ่',photos:['https://picsum.photos/seed/land2/800/600'],lat:14.7000,lng:101.4167,govPricePerSqWah:3500,zone:'สีเขียว',ownerName:'คุณสมหญิง รักษ์ดิน',ownerPhone:'089-876-5432',verified:true,postedAt:Date.now()-86400000*5,views:489,priceStart:2800},
+  {id:'L003',title:'ที่ดินติดทะเล หัวหิน ทำเลทอง',province:'ประจวบคีรีขันธ์',district:'หัวหิน',subdistrict:'หนองแก',deedType:'โฉนด',deedNumber:'9999',rai:2,ngan:1,sqWah:25,pricePerSqWah:180000,width:40,depth:60,roadAccess:'ติดถนนใหญ่',useType:'ที่อยู่อาศัย',utilities:['น้ำประปา','ไฟฟ้า','อินเทอร์เน็ต'],description:'ที่ดินติดทะเลหัวหิน หาดส่วนตัว ใกล้สนามกอล์ฟ เหมาะทำวิลล่าหรือบูทีคโฮเทล',photos:['https://picsum.photos/seed/land3/800/600'],lat:12.5684,lng:99.9577,govPricePerSqWah:95000,zone:'สีเหลือง',ownerName:'คุณวิภา ทรัพย์งาม',ownerPhone:'063-111-2233',verified:true,postedAt:Date.now()-86400000*1,views:1023,priceStart:120000},
+  {id:'L004',title:'ที่ดินใจกลางเมืองเชียงใหม่ ใกล้นิมมาน',province:'เชียงใหม่',district:'เมืองเชียงใหม่',subdistrict:'สุเทพ',deedType:'โฉนด',deedNumber:'4567',rai:0,ngan:1,sqWah:75,pricePerSqWah:85000,width:18,depth:35,roadAccess:'ติดถนนซอย',useType:'พาณิชย์',utilities:['น้ำประปา','ไฟฟ้า','อินเทอร์เน็ต'],description:'ที่ดินซอยนิมมานเหมินทร์ เดิน 5 นาทีถึงถนนหลัก เหมาะทำคาเฟ่ ร้านอาหาร โฮสเทล',photos:['https://picsum.photos/seed/land4/800/600'],lat:18.7969,lng:98.9658,govPricePerSqWah:60000,zone:'สีแดง',ownerName:'คุณนพ ล้านนา',ownerPhone:'085-555-7788',verified:false,postedAt:Date.now()-86400000*7,views:312,priceStart:55000},
+  {id:'L005',title:'ที่ดินจัดสรรพัทยา ใกล้เทอร์มินอล21',province:'ชลบุรี',district:'บางละมุง',subdistrict:'หนองปรือ',deedType:'โฉนด',deedNumber:'7890',rai:0,ngan:0,sqWah:100,pricePerSqWah:45000,width:20,depth:20,roadAccess:'ติดถนนใหญ่',useType:'ที่อยู่อาศัย',utilities:['น้ำประปา','ไฟฟ้า','อินเทอร์เน็ต'],description:'แปลงในโครงการจัดสรร ถนนคอนกรีต ไฟฟ้าใต้ดิน ใกล้ห้าง 2 กม. เหมาะปลูกบ้านพักผ่อน',photos:['https://picsum.photos/seed/land5/800/600'],lat:12.9236,lng:100.8825,govPricePerSqWah:32000,zone:'สีเหลือง',ownerName:'คุณดารา พัฒนา',ownerPhone:'092-345-6789',verified:true,postedAt:Date.now()-86400000*3,views:678,priceStart:38000},
+  {id:'L006',title:'สวนยาง 50 ไร่ พร้อมโรงเก็บ สุราษฎร์ฯ',province:'สุราษฎร์ธานี',district:'พุนพิน',subdistrict:'ท่าโรงช้าง',deedType:'น.ส.3',deedNumber:'2345',rai:50,ngan:0,sqWah:0,pricePerSqWah:1200,width:250,depth:800,roadAccess:'ติดถนนซอย',useType:'เกษตรกรรม',utilities:['ไฟฟ้า'],description:'สวนยางพารา 50 ไร่ ต้นยางอายุ 15 ปี เก็บน้ำยางได้ทุกวัน มีโรงเก็บและบ้านพักคนงาน',photos:['https://picsum.photos/seed/land6/800/600'],lat:8.9367,lng:99.0233,govPricePerSqWah:1000,zone:'สีเขียว',ownerName:'คุณชาญ ใจกล้า',ownerPhone:'077-555-1212',verified:false,postedAt:Date.now()-86400000*10,views:156,priceStart:900},
+  {id:'L007',title:'ที่ดินติดถนน 304 ปราจีนบุรี โซนอุตสาหกรรม',province:'ปราจีนบุรี',district:'กบินทร์บุรี',subdistrict:'กบินทร์',deedType:'โฉนด',deedNumber:'3456',rai:15,ngan:0,sqWah:0,pricePerSqWah:8500,width:100,depth:240,roadAccess:'ติดถนนใหญ่',useType:'อุตสาหกรรม',utilities:['น้ำประปา','ไฟฟ้า'],description:'ที่ดินติดถนนทางหลวง 304 หน้ากว้าง 100 ม. ผังเมืองสีม่วง เหมาะคลังสินค้า โรงงาน',photos:['https://picsum.photos/seed/land7/800/600'],lat:13.9522,lng:101.7211,govPricePerSqWah:6500,zone:'สีม่วง',ownerName:'บริษัท ที่ดินไทย จำกัด',ownerPhone:'037-222-3344',verified:true,postedAt:Date.now()-86400000*4,views:845,priceStart:6000},
+  {id:'L008',title:'ที่ดินตาบอดราคาถูก ระยอง',province:'ระยอง',district:'นิคมพัฒนา',subdistrict:'มาบข่า',deedType:'น.ส.3ก',deedNumber:'1212',rai:8,ngan:2,sqWah:0,pricePerSqWah:2800,width:0,depth:0,roadAccess:'ตาบอด',useType:'อเนกประสงค์',utilities:[],description:'ที่ดินไม่ติดถนน ราคาถูกพิเศษ ถ้ามีที่ติดสามารถซื้อทางเข้าได้ เหมาะเก็งกำไรระยะยาว',photos:['https://picsum.photos/seed/land8/800/600'],lat:12.8156,lng:101.2667,govPricePerSqWah:4500,zone:'สีเขียวอ่อน',ownerName:'คุณเอก ลงทุน',ownerPhone:'094-222-1111',verified:false,postedAt:Date.now()-86400000*14,views:267,priceStart:3200},
+  {id:'L009',title:'ที่ดินเชิงเขาใหญ่ วิวพระอาทิตย์ขึ้น',province:'นครราชสีมา',district:'ปากช่อง',subdistrict:'หนองน้ำแดง',deedType:'โฉนด',deedNumber:'6789',rai:10,ngan:0,sqWah:0,pricePerSqWah:7500,width:100,depth:160,roadAccess:'ติดถนนซอย',useType:'ที่อยู่อาศัย',utilities:['ไฟฟ้า'],description:'ที่ดินเชิงเขาใหญ่ วิวภูเขา 360 องศา อากาศดี เหมาะทำรีสอร์ทเล็กหรือบ้านพักตากอากาศ ห่างเขาใหญ่ 8 กม.',photos:['https://picsum.photos/seed/land9/800/600'],lat:14.5167,lng:101.3833,govPricePerSqWah:4500,zone:'สีเขียว',ownerName:'คุณวันชัย เขาใหญ่',ownerPhone:'083-456-7890',verified:true,postedAt:Date.now()-86400000*6,views:567,priceStart:5500},
+  {id:'L010',title:'ที่ดินติดแม่น้ำ อยุธยา เหมาะทำโฮมสเตย์',province:'พระนครศรีอยุธยา',district:'บางปะอิน',subdistrict:'บ้านเลน',deedType:'โฉนด',deedNumber:'8765',rai:1,ngan:3,sqWah:50,pricePerSqWah:18000,width:30,depth:75,roadAccess:'ติดถนนซอย',useType:'อเนกประสงค์',utilities:['น้ำประปา','ไฟฟ้า'],description:'ติดแม่น้ำเจ้าพระยา หน้ากว้าง 30 ม. มุมมองสวยมาก เหมาะทำคาเฟ่ริมน้ำ โฮมสเตย์ ใกล้วัดสำคัญ',photos:['https://picsum.photos/seed/land10/800/600'],lat:14.2333,lng:100.5833,govPricePerSqWah:12000,zone:'สีเหลือง',ownerName:'คุณพิม กรุงเก่า',ownerPhone:'086-789-1234',verified:true,postedAt:Date.now()-86400000*8,views:423,priceStart:14000},
+  {id:'L011',title:'ที่ดินเปล่า ลาดกระบัง 5 ไร่ ใกล้สนามบินสุวรรณภูมิ',province:'กรุงเทพมหานคร',district:'ลาดกระบัง',subdistrict:'ขุมทอง',deedType:'โฉนด',deedNumber:'11223',rai:5,ngan:0,sqWah:0,pricePerSqWah:35000,width:80,depth:100,roadAccess:'ติดถนนใหญ่',useType:'พาณิชย์',utilities:['น้ำประปา','ไฟฟ้า'],description:'ที่ดินติดถนนใหญ่ 6 เลน ห่างสุวรรณภูมิ 8 กม. เหมาะทำคลังสินค้า โกดัง สำนักงาน',photos:['https://picsum.photos/seed/land11/800/600'],lat:13.7252,lng:100.7833,govPricePerSqWah:28000,zone:'สีน้ำตาล',ownerName:'คุณรัตนา ลาดกระบัง',ownerPhone:'064-789-3456',verified:true,postedAt:Date.now()-86400000*1,views:892,priceStart:24000},
+  {id:'L012',title:'ที่ดินวิวทะเล ภูเก็ต ใกล้หาดราไวย์',province:'ภูเก็ต',district:'เมืองภูเก็ต',subdistrict:'ราไวย์',deedType:'โฉนด',deedNumber:'33445',rai:0,ngan:2,sqWah:50,pricePerSqWah:120000,width:25,depth:40,roadAccess:'ติดถนนซอย',useType:'ที่อยู่อาศัย',utilities:['น้ำประปา','ไฟฟ้า','อินเทอร์เน็ต'],description:'ที่ดินวิวทะเลภูเก็ต ห่างหาดราไวย์ 500 ม. ใกล้แหลมพรหมเทพ เหมาะทำพูลวิลล่าให้เช่า',photos:['https://picsum.photos/seed/land12/800/600'],lat:7.7831,lng:98.3300,govPricePerSqWah:75000,zone:'สีเหลือง',ownerName:'คุณภัทร อันดามัน',ownerPhone:'076-345-6789',verified:true,postedAt:Date.now()-86400000*15,views:1456,priceStart:85000},
+];
+
+// ============================================
+// STATE
+// ============================================
+let listings = [];
+let watchlist = new Set();
+let recentlyViewed = [];
+let compareList = [];
+let savedSearches = [];
+let chats = {};
+let reports = [];
+let currentUser = null;
+let filters = { search:'', province:'', deed:'', road:'', verified:'', foreigner:false, priceMin:null, priceMax:null, sizeMin:null, ppswMin:null, sort:'newest' };
+let currentView = 'grid';
+let currentDetailId = null;
+let currentReportId = null;
+let currentChatPlot = null;
+let currentTimeframe = '3Y';
+let mainMap = null, mainMapMarkers = [];
+let detailMap = null;
+let newListingMap = null, newListingMarker = null, newListingCoords = null;
+let uploadedPhotos = [];
+let priceChart = null;
+let sparklineCharts = {};
+let verifyStep = 0;
+
+// ============================================
+// STORAGE
+// ============================================
+function loadListings() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch(e) {}
+  saveListings(SEED);
+  return JSON.parse(JSON.stringify(SEED));
+}
+function saveListings(arr) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); } catch(e) {}
+}
+function loadWatchlist() {
+  try { const raw = localStorage.getItem(WATCH_KEY); if (raw) return new Set(JSON.parse(raw)); } catch(e) {}
+  return new Set();
+}
+function saveWatchlist() { try { localStorage.setItem(WATCH_KEY, JSON.stringify([...watchlist])); } catch(e) {} }
+
+function loadUser() {
+  try { const raw = localStorage.getItem(USER_KEY); if (raw) return JSON.parse(raw); } catch(e) {}
+  return { id:'guest', name:'ผู้เยี่ยมชม', phone:'', tier:1, joinedAt:Date.now(), thaIdVerified:false, deedVerified:false };
+}
+function saveUser() { try { localStorage.setItem(USER_KEY, JSON.stringify(currentUser)); } catch(e) {} }
+
+function loadJSON(key, fallback) {
+  try { const raw = localStorage.getItem(key); if (raw) return JSON.parse(raw); } catch(e) {}
+  return fallback;
+}
+function saveJSON(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {} }
+
+// ============================================
+// SEEDED RANDOM (for stable charts)
+// ============================================
+function seededRand(seedStr, idx) {
+  let h = 0;
+  for (let i = 0; i < seedStr.length; i++) h = ((h<<5) - h + seedStr.charCodeAt(i)) | 0;
+  h = ((h * 9301 + 49297 + idx * 233280) % 233280) / 233280;
+  return Math.abs(h);
+}
+
+// ============================================
+// PRICE HISTORY GENERATION
+// ============================================
+function getPriceHistory(plot) {
+  if (plot._cachedHistory) return plot._cachedHistory;
+
+  const points = [];
+  const today = new Date();
+  const quarters = 8 * 4; // 8 years quarterly
+  const startPrice = plot.priceStart || plot.pricePerSqWah * 0.7;
+  const endPrice = plot.pricePerSqWah;
+
+  for (let i = 0; i <= quarters; i++) {
+    const t = i / quarters;
+    const trend = startPrice + (endPrice - startPrice) * t;
+    const noise = (seededRand(plot.id, i) - 0.5) * trend * 0.08;
+    const date = new Date(today.getFullYear() - 8, today.getMonth(), 1);
+    date.setMonth(date.getMonth() + i * 3);
+    points.push({ date, price: Math.max(100, Math.round(trend + noise)) });
+  }
+  plot._cachedHistory = points;
+  return points;
+}
+
+function getTransactions(plot) {
+  if (plot._cachedTransactions) return plot._cachedTransactions;
+  const history = getPriceHistory(plot);
+  const txs = [];
+  const buyerNames = ['คุณวิชัย เกษตรกร','บริษัท ทุนทรัพย์ จำกัด','คุณสมศักดิ์ ที่ดินดี','คุณนภา รัตนชาติ','คุณประยุทธ์ ใจเย็น','บมจ. พัฒนาที่ดิน','คุณสุพรรณี ที่งาม'];
+
+  // 2-3 historical transactions at random points
+  const numTx = Math.floor(seededRand(plot.id+'tx', 1) * 2) + 2;
+  const indices = [];
+  for (let i = 0; i < numTx; i++) {
+    const idx = Math.floor(seededRand(plot.id+'idx', i*7) * (history.length-1));
+    if (!indices.includes(idx)) indices.push(idx);
+  }
+  indices.sort((a,b)=>a-b);
+
+  let prevSeller = 'เจ้าของเดิม';
+  indices.forEach((idx, i) => {
+    const point = history[idx];
+    const buyer = buyerNames[Math.floor(seededRand(plot.id+'b', i*3) * buyerNames.length)];
+    const totalArea = totalSqWah(plot);
+    txs.push({
+      date: new Date(point.date),
+      pricePerSqWah: point.price,
+      totalPrice: point.price * totalArea,
+      seller: prevSeller,
+      buyer: buyer,
+      type: 'โอนกรรมสิทธิ์',
+    });
+    prevSeller = buyer;
+  });
+
+  // Add current listing as "ประกาศปัจจุบัน"
+  txs.push({
+    date: new Date(plot.postedAt),
+    pricePerSqWah: plot.pricePerSqWah,
+    totalPrice: totalPrice(plot),
+    seller: plot.ownerName,
+    buyer: '—',
+    type: 'ประกาศขายปัจจุบัน',
+    current: true,
+  });
+
+  plot._cachedTransactions = txs;
+  return txs;
+}
+
+function getYtdChange(plot) {
+  const history = getPriceHistory(plot);
+  const today = new Date();
+  const yearStart = new Date(today.getFullYear(), 0, 1);
+  // Find closest point to start of year
+  const yearStartPoint = history.find(p => p.date >= yearStart) || history[history.length - 1];
+  const current = plot.pricePerSqWah;
+  const startPrice = yearStartPoint.price;
+  return ((current - startPrice) / startPrice) * 100;
+}
+
+function get52WeekStats(plot) {
+  const history = getPriceHistory(plot);
+  const yearAgo = new Date();
+  yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+  const lastYear = history.filter(p => p.date >= yearAgo);
+  const prices = lastYear.map(p => p.price).concat([plot.pricePerSqWah]);
+  return {
+    high: Math.max(...prices),
+    low: Math.min(...prices),
+    avg: prices.reduce((s,p)=>s+p, 0) / prices.length,
+  };
+}
+
+function getVolatility(plot) {
+  const history = getPriceHistory(plot);
+  const returns = [];
+  for (let i = 1; i < history.length; i++) {
+    returns.push((history[i].price - history[i-1].price) / history[i-1].price);
+  }
+  const mean = returns.reduce((s,r)=>s+r, 0) / returns.length;
+  const variance = returns.reduce((s,r)=>s+(r-mean)**2, 0) / returns.length;
+  return Math.sqrt(variance) * 100;
+}
+
+// ============================================
+// UTILS
+// ============================================
+function totalSqWah(l) { return (l.rai||0)*400 + (l.ngan||0)*100 + (l.sqWah||0); }
+function totalPrice(l) { return totalSqWah(l) * (l.pricePerSqWah||0); }
+function symbolOf(l) { return `${provCode(l.province)}-${(l.deedNumber||'00000').padStart(5,'0')}`; }
+function formatArea(l) {
+  const parts = [];
+  if (l.rai) parts.push(`${l.rai} ไร่`);
+  if (l.ngan) parts.push(`${l.ngan} งาน`);
+  if (l.sqWah) parts.push(`${l.sqWah} ตร.ว.`);
+  return parts.join(' ') || '0 ตร.ว.';
+}
+function formatPrice(n) {
+  if (n >= 1e9) return `${(n/1e9).toFixed(2)} พันล้าน`;
+  if (n >= 1e6) return `${(n/1e6).toFixed(n>=1e7?1:2)} ล้าน`;
+  if (n >= 1e3) return `${(n/1e3).toFixed(0)}K`;
+  return n.toLocaleString();
+}
+function formatBaht(n) { return '฿' + Math.round(n).toLocaleString(); }
+function formatTimeAgo(ts) {
+  const d = Math.floor((Date.now()-ts)/86400000);
+  if (d < 1) return 'วันนี้';
+  if (d === 1) return 'เมื่อวาน';
+  if (d < 7) return `${d} วันก่อน`;
+  if (d < 30) return `${Math.floor(d/7)} สัปดาห์ก่อน`;
+  if (d < 365) return `${Math.floor(d/30)} เดือนก่อน`;
+  return `${Math.floor(d/365)} ปีก่อน`;
+}
+function formatDate(d) {
+  const date = new Date(d);
+  return date.toLocaleDateString('th-TH', { year:'numeric', month:'short', day:'numeric' });
+}
+function priceDelta(plot) {
+  if (!plot.govPricePerSqWah) return null;
+  const d = ((plot.pricePerSqWah - plot.govPricePerSqWah) / plot.govPricePerSqWah) * 100;
+  return { delta:d, label: d>0?`สูงกว่าประเมิน ${d.toFixed(0)}%`:`ต่ำกว่าประเมิน ${Math.abs(d).toFixed(0)}%`, cls: d>30?'badge-bad':(d>0?'badge-warn':'badge-good') };
+}
+function changeCls(pct) { return pct > 0.1 ? 'text-up' : (pct < -0.1 ? 'text-down' : 'text-flat'); }
+function changeIcon(pct) { return pct > 0.1 ? '▲' : (pct < -0.1 ? '▼' : '−'); }
+function fmtPct(pct) { const sign = pct>0?'+':''; return `${sign}${pct.toFixed(2)}%`; }
+function deedBadgeClass(deed) {
+  if (deed === 'โฉนด') return 'badge-good';
+  if (deed === 'น.ส.3ก') return 'badge-info';
+  if (deed === 'น.ส.3' || deed === 'ส.ค.1') return 'badge-warn';
+  return 'badge-neutral';
+}
+function zoneBadgeClass(zone) {
+  if (!zone) return 'badge-neutral';
+  if (zone.includes('เหลือง')) return 'bg-yellow-100 text-yellow-800 border border-yellow-300';
+  if (zone.includes('แดง')) return 'bg-red-100 text-red-800 border border-red-300';
+  if (zone.includes('ม่วง')) return 'bg-purple-100 text-purple-800 border border-purple-300';
+  if (zone.includes('เขียว')) return 'bg-green-100 text-green-800 border border-green-300';
+  if (zone.includes('น้ำตาล')) return 'bg-amber-100 text-amber-800 border border-amber-300';
+  return 'badge-neutral';
+}
+function toast(msg, ok=true) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-xl text-sm font-medium fade-in ${ok?'bg-stone-900 text-white':'bg-rose-600 text-white'}`;
+  el.classList.remove('hidden');
+  setTimeout(()=>el.classList.add('hidden'), 2400);
+}
+
+// ============================================
+// MARKET INDICES (per province)
+// ============================================
+function computeIndices() {
+  const byProv = {};
+  listings.forEach(l => {
+    if (!byProv[l.province]) byProv[l.province] = [];
+    byProv[l.province].push(l);
+  });
+  const indices = Object.entries(byProv).map(([prov, items]) => {
+    const avgPrice = items.reduce((s,l)=>s+l.pricePerSqWah, 0) / items.length;
+    const avgYtd = items.reduce((s,l)=>s+getYtdChange(l), 0) / items.length;
+    // Compute index timeseries from members
+    const len = getPriceHistory(items[0]).length;
+    const series = [];
+    for (let i = 0; i < len; i++) {
+      let sum = 0, count = 0;
+      items.forEach(it => {
+        const h = getPriceHistory(it);
+        if (h[i]) { sum += h[i].price; count++; }
+      });
+      series.push(sum / count);
+    }
+    return {
+      province: prov, code: provCode(prov), count: items.length,
+      avgPrice, avgYtd, series, items
+    };
+  }).sort((a,b)=>b.count - a.count);
+  return indices;
+}
+
+function renderIndices() {
+  const indices = computeIndices().slice(0, 6);
+  const grid = document.getElementById('indicesGrid');
+  grid.innerHTML = indices.map((idx, i) => {
+    const up = idx.avgYtd > 0;
+    return `
+    <div class="card p-3 hover:shadow-md hover:border-brand-300 transition cursor-pointer" onclick="filterByProvince('${idx.province}')">
+      <div class="flex items-center justify-between mb-1.5">
+        <div class="flex items-center gap-1.5">
+          <span class="mono text-[10px] font-bold px-1.5 py-0.5 bg-stone-900 text-white rounded">${idx.code}</span>
+          <span class="text-xs font-semibold text-stone-700 line-clamp-1">${idx.province}</span>
+        </div>
+        <span class="mono text-[10px] font-bold ${changeCls(idx.avgYtd)}">${changeIcon(idx.avgYtd)} ${fmtPct(idx.avgYtd)}</span>
+      </div>
+      <div class="flex items-baseline gap-1">
+        <span class="mono text-lg font-extrabold text-stone-900">${formatPrice(idx.avgPrice)}</span>
+        <span class="text-[10px] text-stone-500">/ตร.ว.</span>
+      </div>
+      <div class="text-[10px] text-stone-400 mt-0.5">${idx.count} แปลง</div>
+      <div class="spark-wrap"><canvas id="spark-${i}"></canvas></div>
+    </div>
+  `;
+  }).join('');
+
+  // Defer sparkline rendering to next frame for stability
+  requestAnimationFrame(() => {
+    indices.forEach((idx, i) => {
+      const ctx = document.getElementById(`spark-${i}`);
+      if (!ctx) return;
+      try {
+        if (sparklineCharts[i]) sparklineCharts[i].destroy();
+        const trend = idx.avgYtd > 0;
+        sparklineCharts[i] = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: idx.series.map((_,j)=>j),
+            datasets: [{
+              data: idx.series,
+              borderColor: trend ? '#16a34a' : '#dc2626',
+              backgroundColor: trend ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.12)',
+              borderWidth: 1.5, fill: true, tension: 0.35, pointRadius: 0,
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display:false }, tooltip: { enabled: false } },
+            scales: { x: { display:false }, y: { display:false } },
+            animation: false,
+            elements: { line: { borderJoinStyle: 'round' } }
+          }
+        });
+      } catch(e) { console.warn('spark error', e); }
+    });
+  });
+}
+
+// Compute overall index (DDX) — weighted avg of all listings
+function renderHeaderIndex() {
+  if (!listings.length) return;
+  const totalArea = listings.reduce((s,l)=>s+totalSqWah(l), 0);
+  const weighted = listings.reduce((s,l)=>s + l.pricePerSqWah * totalSqWah(l), 0);
+  const avgPpsw = weighted / totalArea;
+  const avgYtd = listings.reduce((s,l)=>s+getYtdChange(l), 0) / listings.length;
+  document.getElementById('indexValue').textContent = formatPrice(avgPpsw);
+  const cEl = document.getElementById('indexChange');
+  cEl.textContent = `${changeIcon(avgYtd)} ${fmtPct(avgYtd)}`;
+  cEl.className = `mono text-xs font-semibold ${changeCls(avgYtd)}`;
+}
+
+// ============================================
+// TOP MOVERS + LATEST + NEWS
+// ============================================
+function renderTopMovers() {
+  const top = [...listings].sort((a,b)=>getYtdChange(b)-getYtdChange(a)).slice(0,5);
+  document.getElementById('topGainers').innerHTML = top.map(l => moverRow(l)).join('');
+  const latest = [...listings].sort((a,b)=>b.postedAt-a.postedAt).slice(0,5);
+  document.getElementById('latestListings').innerHTML = latest.map(l => moverRow(l, true)).join('');
+}
+
+function moverRow(l, isLatest=false) {
+  const ytd = getYtdChange(l);
+  return `
+    <div class="px-4 py-2.5 hover:bg-stone-50 cursor-pointer flex items-center justify-between gap-2" onclick="openDetailView('${l.id}')">
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2 mb-0.5">
+          <span class="symbol !text-[10px] !py-0.5">${symbolOf(l)}</span>
+          <span class="text-[10px] text-stone-500 truncate">${l.district}, ${l.province}</span>
+        </div>
+        <div class="text-xs font-medium text-stone-800 line-clamp-1">${l.title}</div>
+      </div>
+      <div class="text-right shrink-0">
+        <div class="mono text-sm font-bold text-stone-900">${(l.pricePerSqWah||0).toLocaleString()}</div>
+        ${isLatest ? `<div class="text-[10px] text-stone-500">${formatTimeAgo(l.postedAt)}</div>` : `<div class="mono text-[11px] font-semibold ${changeCls(ytd)}">${changeIcon(ytd)} ${fmtPct(ytd)}</div>`}
+      </div>
+    </div>
+  `;
+}
+
+const FAKE_NEWS = [
+  { area:'ชลบุรี', t:'รัฐประกาศแผนขยายมอเตอร์เวย์ ราคาที่ดินบ่อวินคาดพุ่ง 20%', time:'2 ชม.', tag:'🛣️' },
+  { area:'เชียงใหม่', t:'โครงการรถไฟความเร็วสูงเฟส 2 เริ่มเวนคืน ที่ดินรอบสถานีฯ ขายดี', time:'5 ชม.', tag:'🚄' },
+  { area:'ภูเก็ต', t:'นักลงทุนต่างชาติเข้าตลาดที่ดินวิวทะเลภูเก็ตเพิ่มขึ้น 35% YoY', time:'1 วัน', tag:'🌊' },
+  { area:'นครราชสีมา', t:'ราคาที่ดินเขาใหญ่ปรับตัวเพิ่ม 12% หลังเปิดสนามกอล์ฟใหม่', time:'2 วัน', tag:'⛳' },
+  { area:'กรุงเทพ', t:'BTS สีชมพูเปิดให้บริการเต็มสาย ที่ดินรอบสถานีฯ ปรับ +8%', time:'3 วัน', tag:'🚇' },
+];
+function renderNews() {
+  document.getElementById('newsList').innerHTML = FAKE_NEWS.map(n => `
+    <div class="px-4 py-2.5 hover:bg-stone-50 cursor-pointer">
+      <div class="flex items-start gap-2">
+        <span class="text-base">${n.tag}</span>
+        <div class="flex-1 min-w-0">
+          <div class="text-xs font-semibold text-brand-700">${n.area}</div>
+          <div class="text-xs text-stone-800 leading-snug line-clamp-2">${n.t}</div>
+          <div class="text-[10px] text-stone-400 mt-1">${n.time}ที่แล้ว</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ============================================
+// LIVE TICKER
+// ============================================
+function renderTicker() {
+  const items = listings.map(l => {
+    const ytd = getYtdChange(l);
+    const cls = ytd > 0 ? 'text-up' : (ytd < 0 ? 'text-down' : 'text-flat');
+    return `<span class="inline-flex items-center gap-2"><span class="text-stone-300">${symbolOf(l)}</span><span class="text-white font-semibold">${(l.pricePerSqWah||0).toLocaleString()}</span><span class="${cls} font-bold">${changeIcon(ytd)} ${fmtPct(ytd)}</span></span>`;
+  });
+  // Duplicate for seamless scroll
+  document.getElementById('tickerTrack').innerHTML = items.concat(items).join('<span class="text-stone-600">|</span>');
+}
+
+// ============================================
+// LISTING CARD
+// ============================================
+function renderCard(l) {
+  const totalP = totalPrice(l);
+  const ytd = getYtdChange(l);
+  const delta = priceDelta(l);
+  const photo = (l.photos && l.photos[0]) ? l.photos[0] : `https://picsum.photos/seed/${l.id}/800/600`;
+  const isWatched = watchlist.has(l.id);
+  const tier = getTier(l);
+  const fbadges = getFeatureBadges(l);
+  return `
+    <div class="card hover:border-brand-300 hover:shadow-lg cursor-pointer transition fade-in" onclick="openDetailView('${l.id}')">
+      <div class="relative aspect-[4/3] bg-stone-100 overflow-hidden rounded-t-xl">
+        <img src="${photo}" alt="" class="w-full h-full object-cover" loading="lazy" onerror="this.style.display='none'"/>
+        <div class="absolute top-2 left-2 flex flex-wrap gap-1">
+          <span class="symbol !text-[10px]">${symbolOf(l)}</span>
+          ${fbadges.map(b => `<span class="fbadge ${b.cls}">${b.label}</span>`).join('')}
+        </div>
+        <div class="absolute top-2 right-2 flex gap-1">
+          <button onclick="event.stopPropagation();toggleWatchlist('${l.id}')" class="w-7 h-7 rounded-full ${isWatched?'bg-amber-500':'bg-white/90'} flex items-center justify-center hover:scale-110 transition shadow" title="รายการสนใจ">
+            <i data-lucide="star" class="w-3.5 h-3.5 ${isWatched?'text-white fill-white':'text-stone-600'}"></i>
+          </button>
+        </div>
+        <div class="absolute bottom-2 left-2 flex flex-wrap gap-1">
+          <span class="deed-chip ${deedBadgeClass(l.deedType)}">${l.deedType}</span>
+          <span class="tier-badge tier-${tier.level}" title="${tier.tooltip}">${tier.icon} ${tier.shortLabel}</span>
+        </div>
+      </div>
+      <div class="p-3.5">
+        <div class="flex items-center gap-1 text-[10px] text-stone-500 mb-1.5">
+          <i data-lucide="map-pin" class="w-3 h-3"></i>
+          ${l.district}, ${l.province}
+        </div>
+        <h3 class="text-sm font-semibold text-stone-900 leading-snug line-clamp-2 mb-2">${l.title}</h3>
+
+        <div class="flex items-end justify-between mb-2">
+          <div>
+            <div class="mono text-lg font-bold text-stone-900">${(l.pricePerSqWah||0).toLocaleString()}<span class="text-[10px] text-stone-500 font-normal ml-0.5">/ตร.ว.</span></div>
+            <div class="mono text-[11px] font-semibold ${changeCls(ytd)}">${changeIcon(ytd)} ${fmtPct(ytd)} YTD</div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs font-semibold text-stone-700">${formatArea(l)}</div>
+            <div class="text-[10px] text-stone-500">${formatPrice(totalP)}</div>
+          </div>
+        </div>
+
+        ${delta ? `<div class="${delta.cls} text-[10px] font-semibold px-2 py-1 rounded border text-center">${delta.label}</div>` : ''}
+
+        <div class="flex items-center justify-between text-[10px] text-stone-400 pt-2 mt-2 border-t border-stone-100">
+          <span class="flex items-center gap-1"><i data-lucide="eye" class="w-3 h-3"></i> ${l.views||0}</span>
+          <span>${formatTimeAgo(l.postedAt)}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderTableRow(l) {
+  const ytd = getYtdChange(l);
+  const delta = priceDelta(l);
+  return `
+    <tr class="hover:bg-stone-50 cursor-pointer" onclick="openDetailView('${l.id}')">
+      <td class="px-3 py-2.5"><span class="symbol !text-[10px]">${symbolOf(l)}</span></td>
+      <td class="px-3 py-2.5">
+        <div class="font-medium text-stone-900 line-clamp-1">${l.title}</div>
+        <div class="text-[10px] text-stone-500">${l.district}, ${l.province}</div>
+      </td>
+      <td class="px-3 py-2.5"><span class="deed-chip ${deedBadgeClass(l.deedType)}">${l.deedType}</span></td>
+      <td class="px-3 py-2.5 text-right text-xs">${formatArea(l)}</td>
+      <td class="px-3 py-2.5 text-right mono font-semibold">${(l.pricePerSqWah||0).toLocaleString()}</td>
+      <td class="px-3 py-2.5 text-right mono text-xs ${delta && delta.delta>0 ? 'text-down' : 'text-up'}">${delta ? (delta.delta>0?'+':'')+delta.delta.toFixed(0)+'%' : '—'}</td>
+      <td class="px-3 py-2.5 text-right mono font-semibold ${changeCls(ytd)}">${changeIcon(ytd)} ${fmtPct(ytd)}</td>
+      <td class="px-3 py-2.5 text-right mono font-bold text-stone-900">${formatPrice(totalPrice(l))}</td>
+      <td class="px-3 py-2.5 text-right">
+        <button onclick="event.stopPropagation();toggleWatchlist('${l.id}')" class="text-stone-400 hover:text-amber-500"><i data-lucide="star" class="w-4 h-4 ${watchlist.has(l.id)?'fill-amber-500 text-amber-500':''}"></i></button>
+      </td>
+    </tr>
+  `;
+}
+
+// ============================================
+// FILTERS + RENDER
+// ============================================
+function getFiltered() {
+  let arr = [...listings];
+  const f = filters;
+  if (f.search) {
+    const q = f.search.toLowerCase();
+    arr = arr.filter(l =>
+      l.title.toLowerCase().includes(q) ||
+      l.province.toLowerCase().includes(q) ||
+      (l.district||'').toLowerCase().includes(q) ||
+      (l.deedNumber||'').toLowerCase().includes(q) ||
+      symbolOf(l).toLowerCase().includes(q)
+    );
+  }
+  if (f.province) arr = arr.filter(l => l.province === f.province);
+  if (f.deed) arr = arr.filter(l => l.deedType === f.deed);
+  if (f.road) arr = arr.filter(l => l.roadAccess === f.road);
+  if (f.priceMin) arr = arr.filter(l => totalPrice(l) >= f.priceMin);
+  if (f.priceMax) arr = arr.filter(l => totalPrice(l) <= f.priceMax);
+  if (f.sizeMin) arr = arr.filter(l => l.rai >= f.sizeMin);
+  if (f.ppswMin) arr = arr.filter(l => (l.pricePerSqWah||0) >= f.ppswMin);
+  if (f.verified === '3') arr = arr.filter(l => getTier(l).level === 3);
+  if (f.verified === '2+') arr = arr.filter(l => getTier(l).level >= 2);
+  if (f.foreigner) arr = arr.filter(l => isForeignerEligible(l));
+
+  switch (f.sort) {
+    case 'price-asc': arr.sort((a,b)=>totalPrice(a)-totalPrice(b)); break;
+    case 'price-desc': arr.sort((a,b)=>totalPrice(b)-totalPrice(a)); break;
+    case 'size-desc': arr.sort((a,b)=>totalSqWah(b)-totalSqWah(a)); break;
+    case 'ppsw-asc': arr.sort((a,b)=>(a.pricePerSqWah||0)-(b.pricePerSqWah||0)); break;
+    case 'ytd-desc': arr.sort((a,b)=>getYtdChange(b)-getYtdChange(a)); break;
+    case 'ytd-asc': arr.sort((a,b)=>getYtdChange(a)-getYtdChange(b)); break;
+    default: arr.sort((a,b)=>b.postedAt-a.postedAt);
+  }
+  return arr;
+}
+
+function renderListings() {
+  const arr = getFiltered();
+  document.getElementById('resultsCount').textContent = `${arr.length.toLocaleString()} รายการ`;
+  const empty = document.getElementById('emptyState');
+  const grid = document.getElementById('gridView');
+  const table = document.getElementById('tableView');
+  const tbody = document.getElementById('tableBody');
+
+  if (arr.length === 0) {
+    grid.innerHTML = ''; tbody.innerHTML = '';
+    empty.classList.remove('hidden');
+    if (currentView === 'map') renderMainMap([]);
+    return;
+  }
+  empty.classList.add('hidden');
+
+  grid.innerHTML = arr.map(renderCard).join('');
+  tbody.innerHTML = arr.map(renderTableRow).join('');
+  if (currentView === 'map') renderMainMap(arr);
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function setView(v) {
+  currentView = v;
+  document.getElementById('gridView').classList.toggle('hidden', v !== 'grid');
+  document.getElementById('tableView').classList.toggle('hidden', v !== 'table');
+  document.getElementById('mapView').classList.toggle('hidden', v !== 'map');
+  ['btnViewGrid','btnViewTable','btnViewMap'].forEach(id => {
+    const k = id.replace('btnView','').toLowerCase();
+    document.getElementById(id).classList.toggle('bg-white', v === k);
+    document.getElementById(id).classList.toggle('shadow', v === k);
+  });
+  if (v === 'map') renderMainMap(getFiltered());
+}
+
+function renderMainMap(arr) {
+  if (!mainMap) {
+    mainMap = L.map('mainMap').setView([13.736, 100.523], 6);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(mainMap);
+  }
+  mainMapMarkers.forEach(m => mainMap.removeLayer(m));
+  mainMapMarkers = [];
+  if (!arr.length) return;
+  const bounds = [];
+  arr.forEach(l => {
+    if (l.lat && l.lng) {
+      const ytd = getYtdChange(l);
+      const cls = ytd > 0 ? 'bg-emerald-600' : (ytd < 0 ? 'bg-rose-600' : 'bg-stone-600');
+      const icon = L.divIcon({
+        html: `<div class="${cls} text-white px-2 py-1 rounded-full text-xs font-semibold shadow-lg whitespace-nowrap mono">${symbolOf(l)} ${(l.pricePerSqWah||0).toLocaleString()}</div>`,
+        className:'', iconSize:[120,24]
+      });
+      const m = L.marker([l.lat, l.lng], { icon }).addTo(mainMap);
+      m.on('click', () => openDetailView(l.id));
+      mainMapMarkers.push(m);
+      bounds.push([l.lat, l.lng]);
+    }
+  });
+  if (bounds.length === 1) mainMap.setView(bounds[0], 11);
+  else if (bounds.length > 1) mainMap.fitBounds(bounds, { padding: [40,40] });
+  setTimeout(() => mainMap.invalidateSize(), 100);
+}
+
+function applyFilters() {
+  filters.province = document.getElementById('filterProvince').value;
+  filters.deed = document.getElementById('filterDeed').value;
+  filters.road = document.getElementById('filterRoad').value;
+  filters.verified = document.getElementById('filterVerified')?.value || '';
+  filters.foreigner = document.getElementById('filterForeigner')?.checked || false;
+  filters.priceMin = +document.getElementById('filterPriceMin').value || null;
+  filters.priceMax = +document.getElementById('filterPriceMax').value || null;
+  filters.sizeMin = +document.getElementById('filterSizeMin').value || null;
+  filters.ppswMin = +document.getElementById('filterPpswMin').value || null;
+  filters.sort = document.getElementById('filterSort').value;
+  const active = ['province','deed','road','verified','priceMin','priceMax','sizeMin','ppswMin'].filter(k=>filters[k]).length + (filters.foreigner?1:0);
+  document.getElementById('activeFilterDot').classList.toggle('hidden', !active);
+  renderListings();
+}
+function resetFilters() {
+  ['filterProvince','filterDeed','filterRoad','filterPriceMin','filterPriceMax','filterSizeMin','filterPpswMin'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('filterSort').value = 'newest';
+  filters = { search:'', province:'', deed:'', road:'', priceMin:null, priceMax:null, sizeMin:null, ppswMin:null, sort:'newest' };
+  document.getElementById('activeFilterDot').classList.add('hidden');
+  renderListings();
+}
+function toggleFilters() { document.getElementById('advFilters').classList.toggle('hidden'); }
+function filterByProvince(p) {
+  document.getElementById('filterProvince').value = p;
+  applyFilters();
+  document.querySelector('main').scrollIntoView({behavior:'smooth'});
+}
+function goHome() {
+  resetFilters();
+  document.getElementById('globalSearch').value = '';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ============================================
+// DETAIL VIEW (Trading Terminal)
+// ============================================
+function openDetailView(id) {
+  const l = listings.find(x => x.id === id);
+  if (!l) return;
+  currentDetailId = id;
+  l.views = (l.views || 0) + 1;
+  saveListings(listings);
+  pushRecent(id);
+
+  const sym = symbolOf(l);
+  const totalP = totalPrice(l);
+  const totalArea = totalSqWah(l);
+  const ytd = getYtdChange(l);
+  const stats52w = get52WeekStats(l);
+  const vol = getVolatility(l);
+  const delta = priceDelta(l);
+  const govTotal = (l.govPricePerSqWah||0) * totalArea;
+  const transactions = getTransactions(l);
+
+  // Find comparable (same district or province, similar size)
+  const comps = listings.filter(x => x.id !== l.id &&
+    (x.district === l.district || x.province === l.province) &&
+    Math.abs(totalSqWah(x) - totalArea) / totalArea < 3
+  ).slice(0,4);
+
+  const isWatched = watchlist.has(id);
+  document.getElementById('watchBtnLabel').textContent = isWatched ? 'อยู่ในรายการสนใจ' : 'เพิ่มเข้ารายการสนใจ';
+  document.getElementById('watchBtn').classList.toggle('!bg-amber-50', isWatched);
+
+  document.getElementById('detailContent').innerHTML = `
+    <!-- Symbol + Price block -->
+    <div class="grid lg:grid-cols-3 gap-4 mb-4">
+      <div class="lg:col-span-2">
+        <div class="flex items-center gap-2 mb-2 flex-wrap">
+          <span class="symbol !text-sm !py-1.5 !px-2.5">${sym}</span>
+          <span class="deed-chip ${deedBadgeClass(l.deedType)}">${l.deedType}</span>
+          ${l.verified ? '<span class="deed-chip badge-info">✓ Verified Owner</span>' : ''}
+          <span class="deed-chip ${zoneBadgeClass(l.zone)}">ผังเมือง${l.zone||'?'}</span>
+          <span class="text-xs text-stone-500">รหัสประกาศ: ${l.id}</span>
+        </div>
+        <h1 class="display text-2xl md:text-3xl font-bold text-stone-900 mb-1">${l.title}</h1>
+        <div class="flex items-center gap-2 text-sm text-stone-600">
+          <i data-lucide="map-pin" class="w-4 h-4"></i>
+          ${l.subdistrict?l.subdistrict+', ':''}${l.district}, ${l.province}
+        </div>
+      </div>
+      <div class="card p-5 bg-gradient-to-br from-ink-900 to-ink-800 text-white">
+        <div class="text-xs text-stone-400 mb-1">ราคาขายปัจจุบัน</div>
+        <div class="mono display text-4xl font-bold leading-tight">${(l.pricePerSqWah||0).toLocaleString()}<span class="text-base font-normal text-stone-400 ml-1">/ตร.ว.</span></div>
+        <div class="mono text-sm font-semibold mt-1 ${ytd>0?'text-emerald-400':(ytd<0?'text-rose-400':'text-stone-400')}">${changeIcon(ytd)} ${fmtPct(ytd)} YTD</div>
+        <div class="border-t border-white/10 mt-3 pt-3 text-sm">
+          <div class="flex justify-between"><span class="text-stone-400">รวมทั้งแปลง:</span><span class="font-bold">${formatBaht(totalP)}</span></div>
+          <div class="flex justify-between"><span class="text-stone-400">ขนาด:</span><span class="font-semibold">${formatArea(l)}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TRUST PANEL ============ -->
+    ${renderTrustPanel(l)}
+
+    <!-- Quick Stats Bar -->
+    <div class="card p-4 mb-4 grid grid-cols-2 md:grid-cols-6 gap-4">
+      ${statBox('52W สูงสุด', stats52w.high.toLocaleString(), '/ตร.ว.')}
+      ${statBox('52W ต่ำสุด', stats52w.low.toLocaleString(), '/ตร.ว.')}
+      ${statBox('ราคาเฉลี่ย', Math.round(stats52w.avg).toLocaleString(), '/ตร.ว.')}
+      ${statBox('ความผันผวน', vol.toFixed(1)+'%', 'σ')}
+      ${statBox('ราคาประเมินรัฐ', (l.govPricePerSqWah||0).toLocaleString(), '/ตร.ว.', delta?delta.cls:'')}
+      ${statBox('การโอน 8 ปี', transactions.filter(t=>!t.current).length, 'ครั้ง')}
+    </div>
+
+    <!-- Chart -->
+    <div class="card p-4 sm:p-5 mb-4">
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <div>
+          <h2 class="display font-bold text-base sm:text-lg">📈 ราคาย้อนหลัง (บาท/ตร.ว.)</h2>
+          <p class="text-xs text-stone-500">ที่ดินแปลงนี้เคยขายกี่บาท / ราคาเปลี่ยนยังไงในแต่ละช่วงเวลา</p>
+        </div>
+        <div class="flex items-center gap-0.5 bg-stone-100 rounded-lg p-1">
+          ${['1Y','3Y','5Y','ALL'].map(tf => `<button class="tf-btn ${tf===currentTimeframe?'active':''}" onclick="setTimeframe('${tf}')">${tf}</button>`).join('')}
+        </div>
+      </div>
+      <!-- Inline legend -->
+      <div class="flex flex-wrap items-center gap-3 mb-2 text-[11px] text-stone-600">
+        <div class="flex items-center gap-1.5"><span class="w-4 h-1 rounded bg-brand-600"></span>ราคาตลาด</div>
+        <div class="flex items-center gap-1.5"><span class="w-4 h-0.5 bg-amber-500" style="background:repeating-linear-gradient(90deg,#f59e0b 0 3px,transparent 3px 6px)"></span>ราคาประเมินรัฐ</div>
+        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-rose-200"></span>เคยซื้อขายจริง</div>
+      </div>
+      <div class="relative" style="height:300px"><canvas id="priceChart"></canvas></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="card mb-4">
+      <div class="border-b border-stone-200 px-2 flex overflow-x-auto scrollbar-hide">
+        <button class="tab-btn active" data-tab="overview" onclick="setTab('overview')">ภาพรวม</button>
+        <button class="tab-btn" data-tab="transactions" onclick="setTab('transactions')">ประวัติซื้อขาย <span class="ml-1 px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded text-[10px]">${transactions.length}</span></button>
+        <button class="tab-btn" data-tab="calculator" onclick="setTab('calculator')">💰 ค่าโอน-ภาษี</button>
+        <button class="tab-btn" data-tab="contact" onclick="setTab('contact')">💬 ติดต่อ</button>
+        <button class="tab-btn" data-tab="compare" onclick="setTab('compare')">ที่ดินเทียบเคียง <span class="ml-1 px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded text-[10px]">${comps.length}</span></button>
+        <button class="tab-btn" data-tab="details" onclick="setTab('details')">รายละเอียด</button>
+        <button class="tab-btn" data-tab="map" onclick="setTab('map')">แผนที่</button>
+      </div>
+
+      <!-- Tab: Overview -->
+      <div data-tabcontent="overview" class="p-5">
+        <div class="grid md:grid-cols-2 gap-5">
+          <div>
+            <h3 class="display font-bold mb-3">สรุปการลงทุน</h3>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between p-2.5 bg-stone-50 rounded-lg"><span class="text-stone-600">ราคาเริ่มต้น (8 ปีก่อน):</span><span class="mono font-semibold">${(l.priceStart||0).toLocaleString()}/ตร.ว.</span></div>
+              <div class="flex justify-between p-2.5 bg-stone-50 rounded-lg"><span class="text-stone-600">ราคาปัจจุบัน:</span><span class="mono font-semibold">${(l.pricePerSqWah||0).toLocaleString()}/ตร.ว.</span></div>
+              <div class="flex justify-between p-2.5 ${l.pricePerSqWah>l.priceStart?'bg-emerald-50':'bg-rose-50'} rounded-lg">
+                <span class="text-stone-600">การเติบโต 8 ปี:</span>
+                <span class="mono font-bold ${l.pricePerSqWah>l.priceStart?'text-up':'text-down'}">${l.pricePerSqWah>l.priceStart?'+':''}${((l.pricePerSqWah-l.priceStart)/l.priceStart*100).toFixed(1)}% (CAGR ${(Math.pow(l.pricePerSqWah/l.priceStart, 1/8)*100-100).toFixed(2)}%/ปี)</span>
+              </div>
+              ${delta ? `
+              <div class="flex justify-between p-2.5 ${delta.cls} rounded-lg !border">
+                <span>vs ราคาประเมินรัฐ:</span>
+                <span class="mono font-bold">${delta.label}</span>
+              </div>` : ''}
+            </div>
+          </div>
+          <div>
+            <h3 class="display font-bold mb-3">📋 รายละเอียด</h3>
+            <p class="text-sm text-stone-700 leading-relaxed">${l.description||'—'}</p>
+            ${(l.utilities && l.utilities.length) ? `
+              <div class="mt-3 flex flex-wrap gap-1">
+                ${l.utilities.map(u => `<span class="deed-chip badge-good">✓ ${u}</span>`).join('')}
+              </div>
+            ` : ''}
+          </div>
+        </div>
+
+        <!-- Owner card -->
+        <div class="mt-5 pt-5 border-t border-stone-200 grid md:grid-cols-3 gap-4 items-center">
+          <div class="md:col-span-2 flex items-center gap-3">
+            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-lg shrink-0">${(l.ownerName||'?').charAt(0)}</div>
+            <div>
+              <div class="font-semibold text-stone-900">${l.ownerName} ${l.verified?'<span class="text-sky-500 ml-1">✓</span>':''}</div>
+              <div class="text-xs text-stone-500">เจ้าของที่ดิน • ลงประกาศ ${formatTimeAgo(l.postedAt)}</div>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <a href="tel:${l.ownerPhone}" class="btn-primary flex-1"><i data-lucide="phone" class="w-4 h-4"></i>โทร</a>
+            <button class="btn-secondary"><i data-lucide="message-circle" class="w-4 h-4"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Transactions -->
+      <div data-tabcontent="transactions" class="p-5 hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-stone-50 text-stone-600 text-xs uppercase">
+              <tr>
+                <th class="text-left px-3 py-2">วันที่</th>
+                <th class="text-left px-3 py-2">ประเภท</th>
+                <th class="text-right px-3 py-2">บาท/ตร.ว.</th>
+                <th class="text-right px-3 py-2">มูลค่ารวม</th>
+                <th class="text-right px-3 py-2">เทียบประเมิน</th>
+                <th class="text-left px-3 py-2">ผู้ขาย</th>
+                <th class="text-left px-3 py-2">ผู้ซื้อ</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-stone-100">
+              ${transactions.slice().reverse().map((tx, idx, arr) => {
+                const prevTx = arr[idx+1];
+                const change = prevTx ? ((tx.pricePerSqWah - prevTx.pricePerSqWah)/prevTx.pricePerSqWah * 100) : null;
+                const deltaGov = ((tx.pricePerSqWah - (l.govPricePerSqWah||tx.pricePerSqWah))/(l.govPricePerSqWah||tx.pricePerSqWah) * 100);
+                return `
+                <tr class="${tx.current?'bg-amber-50':'hover:bg-stone-50'}">
+                  <td class="px-3 py-2.5 text-xs">${formatDate(tx.date)}</td>
+                  <td class="px-3 py-2.5"><span class="deed-chip ${tx.current?'badge-warn':'badge-info'}">${tx.type}</span></td>
+                  <td class="px-3 py-2.5 text-right mono font-semibold">${tx.pricePerSqWah.toLocaleString()}${change!==null?`<div class="text-[10px] font-semibold ${change>0?'text-up':'text-down'}">${change>0?'+':''}${change.toFixed(1)}%</div>`:''}</td>
+                  <td class="px-3 py-2.5 text-right mono">${formatBaht(tx.totalPrice)}</td>
+                  <td class="px-3 py-2.5 text-right mono text-xs ${deltaGov>0?'text-down':'text-up'}">${deltaGov>0?'+':''}${deltaGov.toFixed(0)}%</td>
+                  <td class="px-3 py-2.5 text-xs text-stone-600">${tx.seller}</td>
+                  <td class="px-3 py-2.5 text-xs text-stone-600">${tx.buyer}</td>
+                </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+        <p class="text-xs text-stone-500 mt-3">⚠️ ข้อมูลประวัติการโอนเป็นข้อมูลจำลองสำหรับ MVP — ในผลิตภัณฑ์จริงจะดึงจากกรมที่ดิน (DOL)</p>
+      </div>
+
+      <!-- Tab: Compare -->
+      <div data-tabcontent="compare" class="p-5 hidden">
+        ${comps.length ? `
+          <div class="grid sm:grid-cols-2 gap-3">
+            ${comps.map(c => {
+              const cy = getYtdChange(c);
+              return `
+                <div class="card p-3 hover:border-brand-300 cursor-pointer transition" onclick="openDetailView('${c.id}')">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="symbol !text-[10px]">${symbolOf(c)}</span>
+                    <span class="mono text-xs font-bold ${changeCls(cy)}">${changeIcon(cy)} ${fmtPct(cy)}</span>
+                  </div>
+                  <div class="font-medium text-sm text-stone-900 line-clamp-1 mb-1">${c.title}</div>
+                  <div class="text-xs text-stone-500 mb-2">${c.district}, ${c.province}</div>
+                  <div class="flex items-end justify-between">
+                    <div>
+                      <div class="mono font-bold">${(c.pricePerSqWah||0).toLocaleString()}<span class="text-[10px] text-stone-500">/ตร.ว.</span></div>
+                      <div class="text-[10px] text-stone-500">${formatArea(c)}</div>
+                    </div>
+                    <span class="deed-chip ${deedBadgeClass(c.deedType)}">${c.deedType}</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        ` : '<p class="text-sm text-stone-500 text-center py-8">ยังไม่มีที่ดินเทียบเคียงในพื้นที่ใกล้เคียง</p>'}
+      </div>
+
+      <!-- Tab: Calculator -->
+      <div data-tabcontent="calculator" class="p-5 hidden">
+        ${renderTaxCalculator(l)}
+      </div>
+
+      <!-- Tab: Contact -->
+      <div data-tabcontent="contact" class="p-5 hidden">
+        ${renderContactSection(l)}
+      </div>
+
+      <!-- Tab: Details -->
+      <div data-tabcontent="details" class="p-5 hidden">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
+          ${specBox('🛣️ ทางเข้าออก', l.roadAccess)}
+          ${specBox('📏 หน้ากว้าง', l.width?l.width+' ม.':'-')}
+          ${specBox('📐 ลึก', l.depth?l.depth+' ม.':'-')}
+          ${specBox('🏷️ ประเภทใช้งาน', l.useType||'-')}
+          ${specBox('📜 เลขเอกสาร', l.deedNumber||'-')}
+          ${specBox('🎨 ผังเมือง', l.zone||'-')}
+          ${specBox('📍 พิกัด', l.lat?l.lat.toFixed(4)+', '+l.lng.toFixed(4):'-')}
+          ${specBox('🆔 รหัสประกาศ', l.id)}
+        </div>
+      </div>
+
+      <!-- Tab: Map -->
+      <div data-tabcontent="map" class="p-5 hidden">
+        <div id="detailMapBox" class="w-full h-96 rounded-lg border border-stone-200 overflow-hidden"></div>
+        <p class="text-xs text-stone-500 mt-2">⚠️ ตำแหน่งและรูปแปลงเป็นข้อมูลเบื้องต้น — โปรดตรวจสอบที่สำนักงานที่ดินก่อนตัดสินใจ</p>
+      </div>
+    </div>
+
+    <!-- Photos + Ads -->
+    <div class="grid lg:grid-cols-3 gap-4 mb-4">
+      <div class="lg:col-span-2 card p-4">
+        <h3 class="display font-bold mb-3">รูปภาพ</h3>
+        <div class="grid grid-cols-2 gap-2">
+          ${(l.photos||[]).slice(0,4).map(p => `<img src="${p}" class="aspect-[4/3] w-full rounded-lg object-cover" onerror="this.style.display='none'"/>`).join('') || '<div class="text-sm text-stone-500">ไม่มีรูปภาพ</div>'}
+        </div>
+      </div>
+      <div class="space-y-3">
+        <div class="card p-4 bg-amber-50 border-amber-200">
+          <div class="text-[10px] text-amber-700 uppercase font-bold mb-1">โฆษณา</div>
+          <div class="font-semibold text-amber-900 text-sm">สินเชื่อซื้อที่ดิน 4.5%</div>
+          <div class="text-xs text-amber-800 mt-1">ผ่อนยาว 30 ปี วงเงินสูงสุด 80%</div>
+        </div>
+        <div class="card p-4 bg-sky-50 border-sky-200">
+          <div class="text-[10px] text-sky-700 uppercase font-bold mb-1">บริการในพื้นที่</div>
+          <div class="font-semibold text-sky-900 text-sm">🚜 รังวัด ถมที่ ${l.province}</div>
+          <div class="text-xs text-sky-800 mt-1">ผู้รับเหมาในพื้นที่ ราคาดี</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('detailView').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  window.scrollTo({top:0});
+
+  setTimeout(() => {
+    renderPriceChart(l);
+    if (window.lucide) lucide.createIcons();
+  }, 50);
+}
+
+function specBox(label, value) {
+  return `<div class="card p-3"><div class="text-[10px] text-stone-500 uppercase font-semibold mb-1">${label}</div><div class="font-medium text-stone-800 text-sm">${value}</div></div>`;
+}
+
+// ============================================
+// TRUST PANEL (Airbnb-host style)
+// ============================================
+function renderTrustPanel(l) {
+  const tier = getTier(l);
+  const daysListed = Math.floor((Date.now() - l.postedAt) / 86400000);
+  const ownerJoinedDays = Math.floor((Date.now() - (l.ownerJoinedAt || l.postedAt - 86400000*180)) / 86400000);
+  const inquiries = (chats[l.id] || []).length;
+  const reportsCount = reports.filter(r => r.listingId === l.id).length;
+  const delta = priceDelta(l);
+  const priceAnomalyOk = !delta || Math.abs(delta.delta) < 50;
+  const crossPlatform = l.crossPlatformFound || false;
+  const photosOk = (l.photos||[]).length >= 1;
+  const dupOk = !listings.find(x => x.id !== l.id && x.deedNumber === l.deedNumber && x.deedNumber && l.deedNumber);
+
+  const rows = [
+    { ok: tier.level >= 2, icon: tier.level>=3?'⭐':'🛡️', title: tier.label, sub: tier.level>=3?'ตรวจชื่อในโฉนด vs ThaID ตรงกัน + LandsMaps ✓':tier.level===2?'ยืนยันด้วย ThaID (กรมการปกครอง)':'⚠️ ระวัง — ยังไม่ได้ยืนยันตัวตน' },
+    { ok: dupOk, title: dupOk?'ไม่พบประกาศซ้ำในระบบ':'⚠️ พบประกาศที่อาจซ้ำซ้อน', sub: dupOk?'ระบบตรวจสอบ deed number + ตำแหน่งภูมิศาสตร์':'มีประกาศโฉนดเลขเดียวกันในระบบ' },
+    { ok: !crossPlatform, title: crossPlatform?'พบในแพลตฟอร์มอื่น':'ไม่พบในแพลตฟอร์มอื่น', sub: crossPlatform?'ที่ดินแปลงนี้ถูกลงในเว็บอื่นด้วย':'ระบบไม่พบประกาศนี้ที่ DDproperty/Livinginsider/Kaidee' },
+    { ok: priceAnomalyOk, title: priceAnomalyOk?'ราคาอยู่ในช่วงปกติ':'⚠️ ราคาผิดปกติ', sub: priceAnomalyOk?`ใกล้เคียงราคาเฉลี่ยพื้นที่และราคาประเมินกรมธนารักษ์`:`ห่างจากราคาประเมินมาก โปรดตรวจสอบ` },
+    { ok: photosOk, title: photosOk?'มีรูปภาพประกอบ':'ไม่มีรูปภาพ', sub: photosOk?`${(l.photos||[]).length} รูป — ระบบยังไม่ตรวจรูปซ้ำ`:'ระวังประกาศที่ไม่มีรูป' },
+    { ok: reportsCount === 0, title: reportsCount === 0?'ไม่มีการรายงาน':`⚠️ ถูกรายงาน ${reportsCount} ครั้ง`, sub: reportsCount === 0?'ผู้ใช้คนอื่นไม่ได้รายงานประกาศนี้':'พิจารณาด้วยความระมัดระวัง' },
+  ];
+
+  return `
+    <div class="card p-5 mb-4 bg-gradient-to-br from-emerald-50/50 via-white to-sky-50/30 border-emerald-200">
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h2 class="display font-bold text-lg flex items-center gap-2">
+          <span class="text-2xl">🛡️</span> Trust Panel
+        </h2>
+        <div class="flex items-center gap-3 text-xs text-stone-600">
+          <span>📅 ลงประกาศ ${daysListed} วัน</span>
+          <span>👤 สมาชิก ${ownerJoinedDays} วัน</span>
+          <span>💬 ${inquiries} สอบถาม</span>
+        </div>
+      </div>
+      <div class="grid md:grid-cols-2 gap-x-6 gap-y-1">
+        ${rows.map(r => `
+          <div class="trust-row">
+            <div class="${r.ok ? 'trust-icon-ok' : 'trust-icon-warn'}">
+              <i data-lucide="${r.ok ? 'check' : 'alert-triangle'}" class="w-3.5 h-3.5"></i>
+            </div>
+            <div class="flex-1">
+              <div class="font-semibold text-stone-800 text-sm">${r.title}</div>
+              <div class="text-xs text-stone-500">${r.sub}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      ${tier.level < 3 ? `<div class="mt-3 pt-3 border-t border-stone-200 text-xs text-stone-600">💡 <strong>ก่อนติดต่อ:</strong> ขอดูบัตรประชาชน + โฉนดตัวจริงเสมอ ตรวจสอบกับสำนักงานที่ดินก่อนวางมัดจำ</div>` : ''}
+    </div>
+  `;
+}
+
+// ============================================
+// TAX CALCULATOR UI
+// ============================================
+function renderTaxCalculator(l) {
+  const totalP = totalPrice(l);
+  const govTotal = (l.govPricePerSqWah||0) * totalSqWah(l);
+  return `
+    <div class="grid lg:grid-cols-2 gap-5">
+      <div>
+        <h3 class="display font-bold mb-3">💰 คำนวณค่าโอน + ภาษีสำหรับแปลงนี้</h3>
+        <p class="text-xs text-stone-500 mb-4">สูตรตามกรมที่ดิน + กรมสรรพากร (ปี 2568-2569) — ผลลัพธ์ปรับสดเมื่อเปลี่ยน input</p>
+
+        <div class="space-y-3">
+          <div>
+            <label class="label">ราคาขาย (บาท)</label>
+            <input id="calcSale" type="number" value="${totalP}" class="input mono font-semibold" oninput="updateTaxCalc()" />
+            <div class="text-[10px] text-stone-500 mt-0.5">ราคาประเมินกรมธนารักษ์: ${formatBaht(govTotal)}</div>
+          </div>
+          <div>
+            <label class="label">จำนวนปีที่ถือครอง</label>
+            <div class="grid grid-cols-5 gap-1">
+              ${[1,2,3,4,5,6,7,8,9,'10+'].map(y => `<button type="button" class="tf-btn ${y===1?'active':''}" data-years="${y===10?10:y}" onclick="setCalcYears(${y===10?10:y}, this)">${y}</button>`).join('')}
+            </div>
+          </div>
+          <div class="space-y-2">
+            <label class="flex items-start gap-2 text-sm p-2 hover:bg-stone-50 rounded cursor-pointer"><input type="checkbox" id="calcThai" checked class="mt-0.5" onchange="updateTaxCalc()" /><div><div class="font-medium">เป็นคนไทย</div><div class="text-[10px] text-stone-500">ได้สิทธิ์ลดค่าโอน 0.01% (สำหรับที่ดิน ≤7M บาท ถึง 30 มิ.ย. 2569)</div></div></label>
+            <label class="flex items-start gap-2 text-sm p-2 hover:bg-stone-50 rounded cursor-pointer"><input type="checkbox" id="calcResidence" class="mt-0.5" onchange="updateTaxCalc()" /><div><div class="font-medium">เป็นที่อยู่อาศัยหลัก</div><div class="text-[10px] text-stone-500">ชื่อในทะเบียนบ้าน ≥1 ปี → ยกเว้น SBT</div></div></label>
+            <label class="flex items-start gap-2 text-sm p-2 hover:bg-stone-50 rounded cursor-pointer"><input type="checkbox" id="calcInherit" class="mt-0.5" onchange="updateTaxCalc()" /><div><div class="font-medium">ได้รับจากมรดก</div><div class="text-[10px] text-stone-500">ยกเว้น SBT</div></div></label>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card p-4 bg-gradient-to-br from-stone-50 to-white">
+          <h3 class="display font-bold mb-3">📋 สรุปค่าใช้จ่ายการโอน</h3>
+          <div id="calcResult"></div>
+        </div>
+        <div class="mt-3 text-[10px] text-stone-500 leading-relaxed">
+          ⚖️ <strong>ข้อมูลอ้างอิง:</strong> ค่าธรรมเนียมโอน 2% (ลด 0.01% บางกรณี) • SBT 3.3% (ถือ &lt;5 ปี) • Stamp Duty 0.5% (ถือ ≥5 ปี) • WHT ตาม PIT บุคคลธรรมดา 0-35% หักตามปีถือครอง • ผลลัพธ์เป็นการประมาณ โปรดปรึกษานักบัญชี/ทนายเพื่อความถูกต้อง
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+let calcYears = 1;
+function setCalcYears(y, btn) {
+  calcYears = y;
+  document.querySelectorAll('[data-years]').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  updateTaxCalc();
+}
+function updateTaxCalc() {
+  const l = listings.find(x => x.id === currentDetailId);
+  if (!l) return;
+  const salePrice = +document.getElementById('calcSale').value || totalPrice(l);
+  const appraisedPrice = (l.govPricePerSqWah||0) * totalSqWah(l) || salePrice * 0.75;
+  const isThaiNational = document.getElementById('calcThai').checked;
+  const isPrimaryResidence = document.getElementById('calcResidence').checked;
+  const isInherited = document.getElementById('calcInherit').checked;
+  const r = calcThaiFees({ salePrice, appraisedPrice, yearsHeld: calcYears, isPrimaryResidence, isInherited, isThaiNational });
+  document.getElementById('calcResult').innerHTML = `
+    <div class="space-y-1.5 text-sm">
+      <div class="flex justify-between p-2 ${r.isReducedTransferFee?'bg-emerald-50':'bg-stone-50'} rounded"><span>📜 ค่าธรรมเนียมการโอน ${r.isReducedTransferFee?'<span class="text-[10px] text-emerald-700">(ลดเหลือ 0.01%)</span>':'(2%)'}</span><span class="mono font-bold">${formatBaht(r.transferFee)}</span></div>
+      <div class="flex justify-between p-2 ${r.sbtExempt?'bg-emerald-50':'bg-stone-50'} rounded"><span>🏛️ ภาษีธุรกิจเฉพาะ (3.3%) ${r.sbtExempt?'<span class="text-[10px] text-emerald-700">(ยกเว้น)</span>':''}</span><span class="mono font-bold">${formatBaht(r.sbt)}</span></div>
+      <div class="flex justify-between p-2 ${!r.sbtExempt?'bg-emerald-50':'bg-stone-50'} rounded"><span>📑 อากรแสตมป์ (0.5%) ${!r.sbtExempt?'<span class="text-[10px] text-emerald-700">(ไม่ต้องเสีย)</span>':''}</span><span class="mono font-bold">${formatBaht(r.stampDuty)}</span></div>
+      <div class="flex justify-between p-2 bg-stone-50 rounded"><span>💼 ภาษีหัก ณ ที่จ่าย</span><span class="mono font-bold">${formatBaht(r.wht)}</span></div>
+      <div class="flex justify-between p-3 bg-brand-50 border border-brand-200 rounded mt-2"><span class="font-bold">💰 รวม</span><span class="mono font-extrabold text-brand-700 text-lg">${formatBaht(r.total)}</span></div>
+      <div class="grid grid-cols-2 gap-2 mt-3 text-xs">
+        <div class="p-2.5 bg-sky-50 border border-sky-200 rounded">
+          <div class="text-[10px] text-sky-700 font-semibold uppercase">ผู้ซื้อจ่าย (โดยทั่วไป)</div>
+          <div class="mono font-bold text-sm">${formatBaht(r.buyerPays)}</div>
+          <div class="text-[10px] text-stone-500">50% ของค่าโอน</div>
+        </div>
+        <div class="p-2.5 bg-amber-50 border border-amber-200 rounded">
+          <div class="text-[10px] text-amber-700 font-semibold uppercase">ผู้ขายจ่าย</div>
+          <div class="mono font-bold text-sm">${formatBaht(r.sellerPays)}</div>
+          <div class="text-[10px] text-stone-500">50% โอน + SBT/Stamp + WHT</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ============================================
+// CONTACT SECTION
+// ============================================
+function renderContactSection(l) {
+  const tier = getTier(l);
+  return `
+    <div class="grid lg:grid-cols-2 gap-5">
+      <div>
+        <h3 class="display font-bold mb-3">💬 ติดต่อเจ้าของ</h3>
+        <div class="card p-4 mb-3 bg-gradient-to-br from-brand-50 to-white">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-14 h-14 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-2xl">${(l.ownerName||'?').charAt(0)}</div>
+            <div class="flex-1">
+              <div class="font-semibold text-base">${l.ownerName}</div>
+              <span class="tier-badge tier-${tier.level}">${tier.icon} ${tier.label}</span>
+            </div>
+          </div>
+          <div class="space-y-2">
+            <button class="btn-primary w-full" onclick="openChatModal('${l.id}')"><i data-lucide="message-circle" class="w-4 h-4"></i>ส่งข้อความในเว็บ (ปลอดภัย)</button>
+            <a href="tel:${l.ownerPhone}" class="btn-secondary w-full"><i data-lucide="phone" class="w-4 h-4"></i>โทร ${l.ownerPhone}</a>
+            ${l.ownerLine ? `<a href="https://line.me/ti/p/${encodeURIComponent(l.ownerLine)}" target="_blank" class="btn-secondary w-full"><i data-lucide="message-square" class="w-4 h-4"></i>LINE: ${l.ownerLine}</a>` : ''}
+          </div>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-stone-700">
+          ⚠️ <strong>เคล็ดลับเพื่อความปลอดภัย:</strong>
+          <ul class="list-disc list-inside mt-1 space-y-0.5">
+            <li>ดูที่ดินจริงทุกครั้ง ห้ามโอนเงินก่อนเห็น</li>
+            <li>ขอดูบัตรประชาชน + โฉนดตัวจริงของผู้ขาย</li>
+            <li>ตรวจกับสำนักงานที่ดินก่อนวางมัดจำ</li>
+            <li>ใช้ chat ในเว็บ — เก็บประวัติการคุยไว้</li>
+          </ul>
+        </div>
+      </div>
+      <div>
+        <h3 class="display font-bold mb-3">📝 ส่งคำถามด่วน</h3>
+        <div class="space-y-2 text-sm">
+          <button class="w-full text-left p-3 border border-stone-200 rounded-lg hover:bg-stone-50 hover:border-brand-300" onclick="openChatModal('${l.id}');setTimeout(()=>quickChat('สวัสดีครับ สนใจที่ดินแปลงนี้ ขอดูเอกสารโฉนดได้ไหมครับ?'),300)">📋 ขอดูเอกสารโฉนด</button>
+          <button class="w-full text-left p-3 border border-stone-200 rounded-lg hover:bg-stone-50 hover:border-brand-300" onclick="openChatModal('${l.id}');setTimeout(()=>quickChat('ราคาต่อรองได้ไหมครับ?'),300)">💰 ต่อรองราคา</button>
+          <button class="w-full text-left p-3 border border-stone-200 rounded-lg hover:bg-stone-50 hover:border-brand-300" onclick="openChatModal('${l.id}');setTimeout(()=>quickChat('นัดดูสถานที่ได้วันไหนครับ?'),300)">📅 นัดดูสถานที่</button>
+          <button class="w-full text-left p-3 border border-stone-200 rounded-lg hover:bg-stone-50 hover:border-brand-300" onclick="openChatModal('${l.id}');setTimeout(()=>quickChat('ที่ดินติดถนนตรงไหนครับ มีน้ำไฟพร้อมไหม?'),300)">🛣️ สอบถามสาธารณูปโภค</button>
+          <button class="w-full text-left p-3 border border-stone-200 rounded-lg hover:bg-stone-50 hover:border-brand-300" onclick="openChatModal('${l.id}');setTimeout(()=>quickChat('เคยใช้ทำอะไรมาบ้างครับ ผังเมืองให้ทำอะไรได้?'),300)">🎨 ผังเมือง / การใช้งาน</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+function statBox(label, value, unit, cls='') {
+  return `<div><div class="text-[10px] text-stone-500 uppercase font-semibold tracking-wider mb-0.5">${label}</div><div class="mono font-bold text-stone-900 text-base">${value}<span class="text-[10px] font-normal text-stone-500 ml-0.5">${unit||''}</span></div></div>`;
+}
+
+function setTab(name) {
+  document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('[data-tabcontent]').forEach(c => c.classList.toggle('hidden', c.dataset.tabcontent !== name));
+  if (name === 'map' && currentDetailId) {
+    setTimeout(() => initDetailMap(listings.find(l=>l.id===currentDetailId)), 100);
+  }
+  if (name === 'calculator') {
+    calcYears = 1;
+    setTimeout(() => updateTaxCalc(), 50);
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
+function initDetailMap(l) {
+  if (detailMap) { detailMap.remove(); detailMap = null; }
+  if (!l.lat || !l.lng) return;
+  detailMap = L.map('detailMapBox').setView([l.lat, l.lng], 14);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap' }).addTo(detailMap);
+  L.marker([l.lat, l.lng]).addTo(detailMap);
+  const off = 0.002;
+  L.polygon([[l.lat-off,l.lng-off],[l.lat-off,l.lng+off],[l.lat+off,l.lng+off],[l.lat+off,l.lng-off]], { className:'plot-shape' }).addTo(detailMap)
+    .bindTooltip('รูปแปลงโดยประมาณ (LandsMaps)');
+  setTimeout(() => detailMap.invalidateSize(), 100);
+}
+
+function setTimeframe(tf) {
+  currentTimeframe = tf;
+  document.querySelectorAll('.tf-btn').forEach(b => b.classList.toggle('active', b.textContent === tf));
+  if (currentDetailId) renderPriceChart(listings.find(l=>l.id===currentDetailId));
+}
+
+function renderPriceChart(l) {
+  if (priceChart) priceChart.destroy();
+  const ctx = document.getElementById('priceChart');
+  if (!ctx) return;
+  let history = getPriceHistory(l);
+  const transactions = getTransactions(l).filter(t => !t.current);
+
+  // Filter by timeframe
+  const now = Date.now();
+  let cutoff = 0;
+  if (currentTimeframe === '6M') cutoff = now - 180*86400000;
+  else if (currentTimeframe === '1Y') cutoff = now - 365*86400000;
+  else if (currentTimeframe === '3Y') cutoff = now - 3*365*86400000;
+  else if (currentTimeframe === '5Y') cutoff = now - 5*365*86400000;
+  if (cutoff) history = history.filter(p => p.date.getTime() >= cutoff);
+  if (!history.length) history = getPriceHistory(l).slice(-4);
+
+  // Add current as last point
+  const labels = history.map(p => p.date);
+  const prices = history.map(p => p.price);
+  const govPrice = l.govPricePerSqWah || 0;
+
+  // Transaction dots
+  const txData = labels.map(d => {
+    const tx = transactions.find(t => Math.abs(t.date.getTime() - d.getTime()) < 50*86400000);
+    return tx ? tx.pricePerSqWah : null;
+  });
+
+  priceChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label:'ราคาตลาด',
+          data: prices,
+          borderColor:'#347248',
+          backgroundColor:(ctx)=>{
+            const c = ctx.chart.ctx;
+            const grad = c.createLinearGradient(0,0,0,300);
+            grad.addColorStop(0,'rgba(52,114,72,0.28)');
+            grad.addColorStop(1,'rgba(52,114,72,0)');
+            return grad;
+          },
+          borderWidth:2.5, fill:true, tension:0.35, pointRadius:0, pointHoverRadius:6, pointHoverBackgroundColor:'#347248', pointHoverBorderColor:'#fff', pointHoverBorderWidth:2,
+        },
+        {
+          label:'ราคาประเมินรัฐ',
+          data: labels.map(()=>govPrice),
+          borderColor:'#f59e0b', borderDash:[5,5],
+          borderWidth:1.5, fill:false, pointRadius:0,
+        },
+        {
+          label:'เคยซื้อขายจริง',
+          data: txData,
+          borderColor:'#fff', borderWidth:2, backgroundColor:'#dc2626',
+          pointRadius:7, pointHoverRadius:9, showLine:false,
+        }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      animation:{ duration: 600 },
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          mode:'index', intersect:false,
+          backgroundColor:'rgba(10,14,20,0.95)',
+          padding:10,
+          titleFont:{size:12,weight:'bold'},
+          bodyFont:{size:12},
+          displayColors:true,
+          callbacks:{
+            title:(items)=>{
+              const d = items[0].parsed.x ? new Date(items[0].parsed.x) : items[0].label;
+              return new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'long'});
+            },
+            label:(item)=>{
+              if (item.dataset.label === 'เคยซื้อขายจริง' && item.parsed.y === null) return null;
+              return `  ${item.dataset.label}: ${Math.round(item.parsed.y).toLocaleString()} ฿/ตร.ว.`;
+            }
+          }
+        }
+      },
+      scales:{
+        x:{
+          type:'time',
+          time:{ unit:'year', displayFormats:{month:'MMM yy', year:'yyyy'} },
+          grid:{display:false},
+          border:{display:false},
+          ticks:{ color:'#78716c', font:{size:11}, maxRotation:0 },
+        },
+        y:{
+          position:'right',
+          grid:{color:'rgba(0,0,0,0.05)', drawTicks:false},
+          border:{display:false},
+          ticks:{ color:'#78716c', font:{size:11}, padding:8, callback:(v)=>{
+            if (v >= 1000000) return (v/1000000).toFixed(1)+'M';
+            if (v >= 1000) return (v/1000).toFixed(0)+'K';
+            return v;
+          } },
+        }
+      }
+    }
+  });
+}
+
+function closeDetailView() {
+  document.getElementById('detailView').classList.add('hidden');
+  document.body.style.overflow = '';
+  if (detailMap) { detailMap.remove(); detailMap = null; }
+  if (priceChart) { priceChart.destroy(); priceChart = null; }
+  currentDetailId = null;
+}
+
+// ============================================
+// WATCHLIST
+// ============================================
+function toggleWatchlist(id) {
+  if (watchlist.has(id)) { watchlist.delete(id); toast('ลบออกจากรายการสนใจแล้ว'); }
+  else { watchlist.add(id); toast('⭐ เพิ่มเข้ารายการสนใจแล้ว'); }
+  saveWatchlist();
+  updateWatchlistBadge();
+  renderListings();
+  if (currentDetailId) {
+    const isW = watchlist.has(currentDetailId);
+    document.getElementById('watchBtnLabel').textContent = isW?'อยู่ในรายการสนใจ':'เพิ่มเข้ารายการสนใจ';
+    document.getElementById('watchBtn').classList.toggle('!bg-amber-50', isW);
+  }
+}
+function updateWatchlistBadge() {
+  const b = document.getElementById('watchlistBadge');
+  if (watchlist.size > 0) { b.textContent = watchlist.size; b.classList.remove('hidden'); }
+  else b.classList.add('hidden');
+}
+function openWatchlist() {
+  document.getElementById('watchlistOverlay').classList.remove('hidden');
+  document.getElementById('watchlistDrawer').classList.add('open');
+  renderWatchlistBody();
+}
+function closeWatchlist() {
+  document.getElementById('watchlistOverlay').classList.add('hidden');
+  document.getElementById('watchlistDrawer').classList.remove('open');
+}
+function renderWatchlistBody() {
+  const items = listings.filter(l => watchlist.has(l.id));
+  const body = document.getElementById('watchlistBody');
+  if (!items.length) {
+    body.innerHTML = `<div class="text-center py-12">
+      <div class="inline-flex w-14 h-14 rounded-full bg-stone-100 items-center justify-center mb-3"><i data-lucide="star" class="w-7 h-7 text-stone-400"></i></div>
+      <div class="text-sm text-stone-600">ยังไม่มีรายการที่สนใจ</div>
+      <div class="text-xs text-stone-400 mt-1">คลิกดาวบนการ์ดที่ดินเพื่อเพิ่ม</div>
+    </div>`;
+  } else {
+    body.innerHTML = items.map(l => {
+      const ytd = getYtdChange(l);
+      return `
+        <div class="card p-3 mb-2 hover:border-brand-300 cursor-pointer" onclick="closeWatchlist();openDetailView('${l.id}')">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="symbol !text-[10px]">${symbolOf(l)}</span>
+            <button onclick="event.stopPropagation();toggleWatchlist('${l.id}');renderWatchlistBody()" class="text-amber-500"><i data-lucide="star" class="w-4 h-4 fill-amber-500"></i></button>
+          </div>
+          <div class="text-xs font-medium text-stone-900 line-clamp-1 mb-1">${l.title}</div>
+          <div class="text-[10px] text-stone-500 mb-2">${l.district}, ${l.province}</div>
+          <div class="flex items-end justify-between">
+            <div>
+              <div class="mono font-bold text-sm">${(l.pricePerSqWah||0).toLocaleString()}<span class="text-[10px] text-stone-500">/ตร.ว.</span></div>
+              <div class="mono text-[11px] ${changeCls(ytd)} font-semibold">${changeIcon(ytd)} ${fmtPct(ytd)}</div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs font-semibold">${formatArea(l)}</div>
+              <div class="text-[10px] text-stone-500">${formatPrice(totalPrice(l))}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
+// ============================================
+// ADD LISTING
+// ============================================
+function openAddModal() {
+  document.getElementById('addModal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('addForm').reset();
+  uploadedPhotos = [];
+  newListingCoords = null;
+  document.getElementById('photoPreview').innerHTML = '';
+  document.getElementById('newCoords').textContent = 'ยังไม่ได้ปักหมุด';
+  document.getElementById('areaTotal').innerHTML = 'รวม: <span class="font-semibold">0 ตร.ว.</span>';
+  document.getElementById('priceTotal').textContent = '฿ 0';
+  renderVerifyGate();
+  setTimeout(() => {
+    if (newListingMap) { newListingMap.remove(); newListingMap = null; }
+    newListingMap = L.map('newMap').setView([13.736, 100.523], 6);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap' }).addTo(newListingMap);
+    newListingMap.on('click', e => {
+      newListingCoords = { lat:e.latlng.lat, lng:e.latlng.lng };
+      if (newListingMarker) newListingMap.removeLayer(newListingMarker);
+      newListingMarker = L.marker([e.latlng.lat, e.latlng.lng]).addTo(newListingMap);
+      document.getElementById('newCoords').textContent = `📍 ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
+    });
+    setTimeout(() => newListingMap.invalidateSize(), 100);
+    if (window.lucide) lucide.createIcons();
+  }, 100);
+}
+function closeAddModal() {
+  document.getElementById('addModal').classList.add('hidden');
+  document.body.style.overflow = '';
+  if (newListingMap) { newListingMap.remove(); newListingMap = null; newListingMarker = null; }
+}
+function updateAreaCalc() {
+  const rai = +document.getElementById('newRai').value||0;
+  const ngan = +document.getElementById('newNgan').value||0;
+  const sqWah = +document.getElementById('newSqWah').value||0;
+  const total = rai*400 + ngan*100 + sqWah;
+  document.getElementById('areaTotal').innerHTML = `รวม: <span class="font-semibold">${total.toLocaleString()} ตร.ว.</span>${total?` (${(total/400).toFixed(2)} ไร่)`:''}`;
+  updatePriceCalc();
+}
+function updatePriceCalc() {
+  const rai = +document.getElementById('newRai').value||0;
+  const ngan = +document.getElementById('newNgan').value||0;
+  const sqWah = +document.getElementById('newSqWah').value||0;
+  const ppsw = +document.getElementById('newPricePerSqWah').value||0;
+  const total = (rai*400+ngan*100+sqWah)*ppsw;
+  document.getElementById('priceTotal').textContent = total?`฿ ${total.toLocaleString()}`:'฿ 0';
+}
+function handlePhotoUpload(e) {
+  const files = Array.from(e.target.files).slice(0,5);
+  const preview = document.getElementById('photoPreview');
+  preview.innerHTML = ''; uploadedPhotos = [];
+  files.forEach(f => {
+    const r = new FileReader();
+    r.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const cv = document.createElement('canvas');
+        const sc = Math.min(1, 800/img.width);
+        cv.width = img.width*sc; cv.height = img.height*sc;
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        const url = cv.toDataURL('image/jpeg', 0.7);
+        uploadedPhotos.push(url);
+        const d = document.createElement('div');
+        d.className = 'aspect-square rounded-lg overflow-hidden border border-stone-200';
+        d.innerHTML = `<img src="${url}" class="w-full h-full object-cover" />`;
+        preview.appendChild(d);
+      };
+      img.src = ev.target.result;
+    };
+    r.readAsDataURL(f);
+  });
+}
+function submitListing(e) {
+  e.preventDefault();
+  // GATE: must be Tier 2+
+  if (currentUser.tier < 2) {
+    toast('ต้องยืนยันตัวตน (T2) ก่อนลงประกาศ', false);
+    openVerifyModal();
+    return;
+  }
+  if (!newListingCoords) { toast('กรุณาคลิกบนแผนที่เพื่อปักหมุด', false); return; }
+  const utils = Array.from(document.querySelectorAll('.util-cb:checked')).map(c=>c.value);
+  const ppsw = +document.getElementById('newPricePerSqWah').value||0;
+  const newL = {
+    id:'L'+Date.now(),
+    title: document.getElementById('newDescription').value.substring(0,60) || `ที่ดิน ${document.getElementById('newDeedType').value} ${document.getElementById('newDistrict').value}`,
+    province: document.getElementById('newProvince').value,
+    district: document.getElementById('newDistrict').value,
+    subdistrict: document.getElementById('newSubdistrict').value,
+    deedType: document.getElementById('newDeedType').value,
+    deedNumber: document.getElementById('newDeedNumber').value || String(Math.floor(Math.random()*90000)+10000),
+    rai: +document.getElementById('newRai').value||0,
+    ngan: +document.getElementById('newNgan').value||0,
+    sqWah: +document.getElementById('newSqWah').value||0,
+    pricePerSqWah: ppsw,
+    width: +document.getElementById('newWidth').value||0,
+    depth: +document.getElementById('newDepth').value||0,
+    roadAccess: document.getElementById('newRoadAccess').value,
+    useType: document.getElementById('newUseType').value,
+    utilities: utils,
+    description: document.getElementById('newDescription').value,
+    photos: uploadedPhotos.length?uploadedPhotos:[`https://picsum.photos/seed/new${Date.now()}/800/600`],
+    lat: newListingCoords.lat, lng: newListingCoords.lng,
+    govPricePerSqWah: Math.round(ppsw*0.75),
+    priceStart: Math.round(ppsw*0.65),
+    zone: 'รอตรวจสอบ',
+    ownerId: currentUser.id,
+    ownerName: document.getElementById('newOwnerName').value || currentUser.name,
+    ownerPhone: document.getElementById('newOwnerPhone').value,
+    ownerLine: document.getElementById('newOwnerLine').value,
+    ownerJoinedAt: currentUser.joinedAt,
+    verifyTier: currentUser.tier,
+    verified: currentUser.tier >= 2,
+    postedAt: Date.now(), views: 0
+  };
+
+  // DUPLICATE DETECTION
+  const dup = detectDuplicates(newL);
+  if (dup) {
+    showDuplicateWarning(dup, newL);
+    return;
+  }
+  finalizeNewListing(newL);
+}
+
+function finalizeNewListing(newL) {
+  listings.unshift(newL);
+  saveListings(listings);
+  closeAddModal();
+  closeDupModal();
+  refreshAll();
+  toast('🎉 ลงประกาศสำเร็จ! รหัส ' + symbolOf(newL));
+}
+
+function showDuplicateWarning(dup, newL) {
+  const existing = dup.match;
+  const hard = dup.type === 'hard';
+  document.getElementById('dupBody').innerHTML = `
+    <div class="space-y-4">
+      <div class="${hard?'bg-rose-50 border-rose-200':'bg-amber-50 border-amber-200'} border rounded-lg p-3 text-sm">
+        ${hard
+          ? `🚫 <strong>พบประกาศที่มีเลขโฉนดเดียวกัน</strong><br/>เลขโฉนด <span class="mono font-bold">${newL.deedNumber}</span> ใน${newL.province} ${newL.deedType} ถูกลงในระบบแล้ว — ห้ามลงซ้ำ`
+          : `⚠️ <strong>อาจซ้ำซ้อน</strong> — พบที่ดินอื่นในตำแหน่งใกล้กัน (ระยะ &lt;50 ม.) ขนาดใกล้เคียง โปรดตรวจสอบ`
+        }
+      </div>
+      <div class="card p-3 hover:border-brand-300 cursor-pointer" onclick="closeDupModal();closeAddModal();openDetailView('${existing.id}')">
+        <div class="flex items-center gap-3">
+          <img src="${existing.photos?.[0]||''}" class="w-20 h-20 object-cover rounded-lg shrink-0" onerror="this.style.display='none'"/>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="symbol !text-[10px]">${symbolOf(existing)}</span>
+              <span class="deed-chip ${deedBadgeClass(existing.deedType)}">${existing.deedType} ${existing.deedNumber||''}</span>
+            </div>
+            <div class="font-semibold text-sm">${existing.title}</div>
+            <div class="text-xs text-stone-500">${existing.district}, ${existing.province} • ${formatArea(existing)} • ${formatBaht(totalPrice(existing))}</div>
+            <div class="text-xs text-stone-500 mt-1">ลงโดย ${existing.ownerName} (${formatTimeAgo(existing.postedAt)})</div>
+          </div>
+        </div>
+      </div>
+      <div class="text-xs text-stone-600 space-y-1">
+        <div>💡 <strong>ทางเลือก:</strong></div>
+        <ul class="list-disc list-inside ml-2 space-y-0.5">
+          ${hard ? '<li>ถ้านี่คือที่ดินของคุณ — รายงานประกาศข้างบนเป็น "เจ้าของไม่ใช่คนลง" ระบบจะตรวจสอบและลบให้</li>' : '<li>ถ้านี่เป็นที่ดินคนละแปลง — กดยืนยันลงประกาศต่อไป</li>'}
+          <li>ถ้าจะลงประกาศเพิ่มเติม กรุณาตรวจเลขโฉนด/ตำแหน่งให้ถูกต้อง</li>
+        </ul>
+      </div>
+      <div class="flex gap-2 pt-2 border-t border-stone-200">
+        <button class="btn-ghost flex-1" onclick="closeDupModal()">กลับไปแก้ไข</button>
+        ${hard
+          ? `<button class="btn-secondary flex-1" onclick="closeDupModal();openReportModal('${existing.id}')">รายงานประกาศนั้น</button>`
+          : `<button class="btn-primary flex-1" onclick="forceFinalize()">ยืนยันลงประกาศ (คนละแปลง)</button>`}
+      </div>
+    </div>
+  `;
+  window._pendingListing = newL;
+  document.getElementById('dupModal').classList.remove('hidden');
+  if (window.lucide) lucide.createIcons();
+}
+function closeDupModal() { document.getElementById('dupModal').classList.add('hidden'); }
+function forceFinalize() { if (window._pendingListing) finalizeNewListing(window._pendingListing); window._pendingListing = null; }
+
+function renderVerifyGate() {
+  const u = currentUser;
+  const gate = document.getElementById('addVerifyGate');
+  const tier = { level: u.tier, icon: u.tier>=3?'⭐':(u.tier===2?'✓':'?'), label: u.tier>=3?'Verified Owner':(u.tier===2?'Verified Identity':'ไม่ได้ยืนยัน') };
+  if (u.tier >= 2) {
+    gate.className = 'p-4 border-b border-stone-200 bg-emerald-50';
+    gate.innerHTML = `
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div class="flex items-center gap-2 text-sm">
+          <i data-lucide="badge-check" class="w-5 h-5 text-emerald-600"></i>
+          <span class="font-semibold text-emerald-900">คุณยืนยันตัวตนแล้ว</span>
+          <span class="tier-badge tier-${tier.level}">${tier.icon} ${tier.label}</span>
+        </div>
+        ${u.tier < 3 ? `<button type="button" class="btn-secondary !py-1.5 !text-xs" onclick="openVerifyModal()">⭐ อัปเกรดเป็น Verified Owner</button>` : ''}
+      </div>
+    `;
+  } else {
+    gate.className = 'p-4 border-b border-stone-200 bg-amber-50 border-amber-200';
+    gate.innerHTML = `
+      <div class="flex items-start justify-between gap-3 flex-wrap">
+        <div class="flex items-start gap-2 text-sm flex-1 min-w-0">
+          <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600 shrink-0 mt-0.5"></i>
+          <div>
+            <div class="font-semibold text-amber-900">ต้องยืนยันตัวตนก่อนลงประกาศ</div>
+            <div class="text-xs text-amber-800 mt-0.5">ใช้ ThaID app (กรมการปกครอง) ใช้เวลา ~30 วินาที — ฟรี</div>
+          </div>
+        </div>
+        <button type="button" class="btn-primary !py-2 !text-xs" onclick="openVerifyModal()">
+          <span class="bg-thaid text-white px-1.5 py-0.5 rounded text-[10px] font-bold">ThaID</span> ยืนยันตัวตน
+        </button>
+      </div>
+    `;
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
+// ============================================
+// REFRESH ALL
+// ============================================
+function refreshAll() {
+  renderHeaderIndex();
+  renderIndices();
+  renderTopMovers();
+  renderTicker();
+  renderListings();
+  updateWatchlistBadge();
+}
+
+// ============================================
+// VERIFICATION TIER HELPERS
+// ============================================
+function getTier(l) {
+  const t = l.verifyTier || (l.verified ? 2 : 1);
+  if (t >= 3) return { level:3, icon:'⭐', shortLabel:'Verified Owner', label:'Verified Owner (โฉนดตรวจสอบแล้ว)', tooltip:'เจ้าของได้ผ่านการตรวจสอบโฉนดกับ LandsMaps' };
+  if (t === 2) return { level:2, icon:'✓', shortLabel:'Verified ID', label:'Verified Identity (ThaID)', tooltip:'ยืนยันตัวตนด้วย ThaID/eKYC แล้ว' };
+  return { level:1, icon:'?', shortLabel:'Unverified', label:'Unverified', tooltip:'ยังไม่ยืนยันตัวตน — ระวังก่อนติดต่อ' };
+}
+
+function getFeatureBadges(l) {
+  const out = [];
+  const daysAgo = (Date.now() - l.postedAt) / 86400000;
+  if (daysAgo < 3) out.push({ cls:'fbadge-new', label:'NEW' });
+  if ((l.views || 0) > 500) out.push({ cls:'fbadge-hot', label:'🔥 HOT' });
+  if (l.priceDropPct && l.priceDropPct > 5) out.push({ cls:'fbadge-drop', label:'📉 -' + Math.round(l.priceDropPct) + '%' });
+  if (l.featured) out.push({ cls:'fbadge-feat', label:'★ FEATURED' });
+  if (l.reserved) out.push({ cls:'fbadge-reserved', label:'จองแล้ว' });
+  return out.slice(0, 2);
+}
+
+function isForeignerEligible(l) {
+  // Land in Thailand: foreigners cannot own directly except through company/leasehold
+  return l.foreignerEligible === true || l.ownerType === 'company';
+}
+
+// ============================================
+// DUPLICATE DETECTION
+// ============================================
+function detectDuplicates(newL) {
+  // Hard key: province + deedType + deedNumber
+  const hardKey = (newL.province||'') + '|' + (newL.deedType||'') + '|' + (newL.deedNumber||'').replace(/\D/g,'');
+  const hardMatch = listings.find(l => {
+    const k = (l.province||'') + '|' + (l.deedType||'') + '|' + (l.deedNumber||'').replace(/\D/g,'');
+    return k === hardKey && (newL.deedNumber||'').length >= 3;
+  });
+  if (hardMatch) return { type:'hard', match: hardMatch };
+
+  // Soft: geo proximity within ~50m + similar size
+  if (newL.lat && newL.lng) {
+    const softMatch = listings.find(l => {
+      if (!l.lat || !l.lng) return false;
+      const dLat = Math.abs(l.lat - newL.lat);
+      const dLng = Math.abs(l.lng - newL.lng);
+      const meters = Math.sqrt(dLat*dLat + dLng*dLng) * 111000;
+      const areaDiff = Math.abs(totalSqWah(l) - totalSqWah(newL)) / Math.max(totalSqWah(l), 1);
+      return meters < 50 && areaDiff < 0.05;
+    });
+    if (softMatch) return { type:'soft', match: softMatch };
+  }
+  return null;
+}
+
+// ============================================
+// THAI TAX CALCULATOR (real formulas)
+// ============================================
+function progressivePIT(income) {
+  const brackets = [[150000,0],[300000,0.05],[500000,0.10],[750000,0.15],[1000000,0.20],[2000000,0.25],[5000000,0.30],[Infinity,0.35]];
+  let tax = 0, lower = 0;
+  for (const [upper, rate] of brackets) {
+    if (income <= lower) break;
+    tax += (Math.min(income, upper) - lower) * rate;
+    lower = upper;
+  }
+  return tax;
+}
+function calcThaiFees({ salePrice, appraisedPrice, yearsHeld, isPrimaryResidence, isInherited, isThaiNational }) {
+  const taxBase = Math.max(salePrice, appraisedPrice);
+  // Transfer fee: 0.01% if Thai national, residential, ≤7M; else 2%
+  const transferRate = (isThaiNational && taxBase <= 7000000) ? 0.0001 : 0.02;
+  const transferFee = taxBase * transferRate;
+  // SBT vs Stamp Duty
+  const sbtExempt = yearsHeld >= 5 || isPrimaryResidence || isInherited;
+  const sbt = sbtExempt ? 0 : taxBase * 0.033;
+  const stampDuty = sbtExempt ? taxBase * 0.005 : 0;
+  // Withholding Tax
+  const factors = {1:0.92, 2:0.84, 3:0.77, 4:0.71, 5:0.65, 6:0.60, 7:0.55};
+  const factor = factors[Math.min(Math.max(yearsHeld,1),7)] ?? 0.50;
+  const yearsForCalc = Math.min(Math.max(yearsHeld,1), 10);
+  const incomeAfterDed = appraisedPrice * (1 - factor);
+  const incomePerYear = incomeAfterDed / yearsForCalc;
+  const taxPerYear = progressivePIT(incomePerYear);
+  let wht = taxPerYear * yearsForCalc;
+  wht = Math.min(wht, salePrice * 0.20);
+  const total = transferFee + sbt + stampDuty + wht;
+  return {
+    transferFee, transferRate, sbt, stampDuty, wht, total,
+    buyerPays: transferFee * 0.5,
+    sellerPays: transferFee * 0.5 + sbt + stampDuty + wht,
+    isReducedTransferFee: transferRate === 0.0001,
+    sbtExempt
+  };
+}
+
+// ============================================
+// RECENTLY VIEWED
+// ============================================
+function pushRecent(id) {
+  recentlyViewed = recentlyViewed.filter(x => x !== id);
+  recentlyViewed.unshift(id);
+  recentlyViewed = recentlyViewed.slice(0, 8);
+  saveJSON(RECENT_KEY, recentlyViewed);
+  renderRecent();
+}
+function renderRecent() {
+  const sec = document.getElementById('recentlyViewedSection');
+  const container = document.getElementById('recentlyViewed');
+  if (!recentlyViewed.length) { sec.classList.add('hidden'); return; }
+  const items = recentlyViewed.map(id => listings.find(l => l.id === id)).filter(Boolean);
+  if (!items.length) { sec.classList.add('hidden'); return; }
+  sec.classList.remove('hidden');
+  container.innerHTML = items.map(l => {
+    const ytd = getYtdChange(l);
+    return `<div class="card hover:border-brand-300 cursor-pointer shrink-0 w-48 p-2" onclick="openDetailView('${l.id}')">
+      <div class="text-[10px] mono mb-1"><span class="symbol !text-[9px] !py-0.5">${symbolOf(l)}</span></div>
+      <div class="text-xs font-medium line-clamp-1">${l.title}</div>
+      <div class="flex items-center justify-between mt-1">
+        <span class="mono text-xs font-bold">${(l.pricePerSqWah||0).toLocaleString()}</span>
+        <span class="mono text-[10px] ${changeCls(ytd)}">${changeIcon(ytd)} ${fmtPct(ytd)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+function clearRecent() { recentlyViewed = []; saveJSON(RECENT_KEY, []); renderRecent(); }
+
+// ============================================
+// COMPARE
+// ============================================
+function addToCompare(id) {
+  if (compareList.includes(id)) { toast('อยู่ในรายการเปรียบเทียบแล้ว', false); return; }
+  if (compareList.length >= 4) { toast('เปรียบเทียบได้สูงสุด 4 แปลง', false); return; }
+  compareList.push(id);
+  saveJSON(COMPARE_KEY, compareList);
+  renderCompareBar();
+  toast('✓ เพิ่มเข้าเปรียบเทียบแล้ว');
+}
+function removeFromCompare(id) {
+  compareList = compareList.filter(x => x !== id);
+  saveJSON(COMPARE_KEY, compareList);
+  renderCompareBar();
+  if (compareList.length > 0) renderCompareModal();
+}
+function clearCompare() { compareList = []; saveJSON(COMPARE_KEY, []); renderCompareBar(); closeCompareModal(); }
+function renderCompareBar() {
+  const bar = document.getElementById('compareBar');
+  const thumbs = document.getElementById('compareThumbs');
+  document.getElementById('compareCount').textContent = compareList.length;
+  if (compareList.length === 0) { bar.classList.remove('show'); return; }
+  bar.classList.add('show');
+  thumbs.innerHTML = compareList.map(id => {
+    const l = listings.find(x => x.id === id);
+    if (!l) return '';
+    return `<div class="flex items-center gap-1.5 bg-stone-100 rounded-lg px-2 py-1">
+      <span class="symbol !text-[10px]">${symbolOf(l)}</span>
+      <span class="text-xs font-medium hidden sm:inline">${l.title.substring(0,20)}...</span>
+      <button class="text-stone-400 hover:text-rose-500" onclick="removeFromCompare('${l.id}')"><i data-lucide="x" class="w-3 h-3"></i></button>
+    </div>`;
+  }).join('');
+  if (window.lucide) lucide.createIcons();
+}
+function openCompareModal() {
+  if (compareList.length < 2) { toast('เลือกอย่างน้อย 2 แปลง', false); return; }
+  document.getElementById('compareModal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  renderCompareModal();
+}
+function closeCompareModal() {
+  document.getElementById('compareModal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+function renderCompareModal() {
+  const items = compareList.map(id => listings.find(l => l.id === id)).filter(Boolean);
+  if (!items.length) return;
+  const rows = [
+    { label:'รูป', render: l => `<img src="${l.photos?.[0]||''}" class="w-full aspect-[4/3] object-cover rounded-lg"/>` },
+    { label:'Symbol', render: l => `<span class="symbol">${symbolOf(l)}</span>` },
+    { label:'ที่ตั้ง', render: l => `${l.district}, ${l.province}` },
+    { label:'ประเภทโฉนด', render: l => `<span class="deed-chip ${deedBadgeClass(l.deedType)}">${l.deedType}</span>` },
+    { label:'ขนาด', render: l => formatArea(l), highlight: 'size' },
+    { label:'ราคา/ตร.ว.', render: l => `<span class="mono font-bold">${(l.pricePerSqWah||0).toLocaleString()}</span>`, highlight: 'ppsw' },
+    { label:'ราคารวม', render: l => `<span class="mono font-bold">${formatBaht(totalPrice(l))}</span>`, highlight: 'total' },
+    { label:'ราคาประเมิน', render: l => `${(l.govPricePerSqWah||0).toLocaleString()} ฿/ตร.ว.` },
+    { label:'YTD', render: l => { const y = getYtdChange(l); return `<span class="mono font-bold ${changeCls(y)}">${changeIcon(y)} ${fmtPct(y)}</span>`; } },
+    { label:'ทางเข้า', render: l => l.roadAccess },
+    { label:'สาธารณูปโภค', render: l => (l.utilities||[]).join(', ') || '-' },
+    { label:'การใช้งาน', render: l => l.useType || '-' },
+    { label:'ผังเมือง', render: l => l.zone || '-' },
+    { label:'ยืนยันตัวตน', render: l => { const t = getTier(l); return `<span class="tier-badge tier-${t.level}">${t.icon} ${t.shortLabel}</span>`; } },
+  ];
+
+  document.getElementById('compareBody').innerHTML = `
+    <table class="w-full text-sm border-collapse">
+      <thead><tr>
+        <th class="text-left p-2 w-32 sticky left-0 bg-white"></th>
+        ${items.map(l => `<th class="p-2 min-w-[200px]"><button class="text-rose-500 text-xs hover:underline" onclick="removeFromCompare('${l.id}')">เอาออก</button></th>`).join('')}
+      </tr></thead>
+      <tbody>
+        ${rows.map(r => `<tr class="border-t border-stone-100">
+          <td class="p-2 font-semibold text-stone-700 sticky left-0 bg-white text-xs">${r.label}</td>
+          ${items.map(l => `<td class="p-2 align-top">${r.render(l)}</td>`).join('')}
+        </tr>`).join('')}
+        <tr class="border-t border-stone-200">
+          <td class="p-2 sticky left-0 bg-white"></td>
+          ${items.map(l => `<td class="p-2"><button class="btn-primary w-full" onclick="closeCompareModal();openDetailView('${l.id}')">ดูรายละเอียด</button></td>`).join('')}
+        </tr>
+      </tbody>
+    </table>
+  `;
+}
+
+// ============================================
+// SHARE
+// ============================================
+function openShareModal(id) {
+  const l = listings.find(x => x.id === id);
+  if (!l) return;
+  const url = `${location.origin}${location.pathname}#listing/${id}`;
+  document.getElementById('shareLink').value = url;
+  document.getElementById('shareInfo').innerHTML = `
+    <div class="font-medium">${l.title}</div>
+    <div class="text-xs text-stone-500 mt-1">${l.district}, ${l.province} • ${formatArea(l)} • ${formatBaht(totalPrice(l))}</div>
+  `;
+  document.getElementById('shareModal').classList.remove('hidden');
+}
+function closeShareModal() { document.getElementById('shareModal').classList.add('hidden'); }
+function shareTo(platform) {
+  const url = document.getElementById('shareLink').value;
+  const text = 'ที่ดินน่าสนใจบนดินดี';
+  const urls = {
+    line: `https://line.me/R/msg/text/?${encodeURIComponent(text + ' ' + url)}`,
+    fb: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+    twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
+    whatsapp: `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`,
+  };
+  window.open(urls[platform], '_blank');
+}
+function copyShareLink() {
+  const inp = document.getElementById('shareLink');
+  inp.select(); document.execCommand('copy');
+  toast('📋 คัดลอกลิงก์แล้ว');
+}
+
+// ============================================
+// REPORT
+// ============================================
+function openReportModal(id) {
+  currentReportId = id;
+  document.getElementById('reportModal').classList.remove('hidden');
+  document.getElementById('reportDetail').value = '';
+  document.querySelectorAll('input[name="reportReason"]').forEach(r => r.checked = false);
+}
+function closeReportModal() { document.getElementById('reportModal').classList.add('hidden'); currentReportId = null; }
+function submitReport() {
+  const reason = document.querySelector('input[name="reportReason"]:checked');
+  if (!reason) { toast('กรุณาเลือกเหตุผล', false); return; }
+  reports.push({ id: 'R'+Date.now(), listingId: currentReportId, reason: reason.value, detail: document.getElementById('reportDetail').value, at: Date.now() });
+  saveJSON(REPORTS_KEY, reports);
+  closeReportModal();
+  toast('🚩 รายงานสำเร็จ ทีมงานจะตรวจสอบภายใน 24 ชม.');
+}
+
+// ============================================
+// CHAT
+// ============================================
+function openChatModal(plotId) {
+  const l = listings.find(x => x.id === plotId);
+  if (!l) return;
+  currentChatPlot = l;
+  if (!chats[plotId]) {
+    chats[plotId] = [
+      { from:'them', text: `สวัสดีครับ ขอบคุณที่สนใจที่ดินแปลงนี้ครับ — ${l.title}`, at: Date.now() - 5000 }
+    ];
+    saveJSON(CHATS_KEY, chats);
+  }
+  const tier = getTier(l);
+  document.getElementById('chatHeader').innerHTML = `
+    <div class="flex items-center gap-2 flex-1 min-w-0">
+      <div class="w-10 h-10 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold">${(l.ownerName||'?').charAt(0)}</div>
+      <div class="min-w-0 flex-1">
+        <div class="font-semibold text-sm flex items-center gap-1">${l.ownerName} <span class="tier-badge tier-${tier.level} !text-[9px]" title="${tier.tooltip}">${tier.icon}</span></div>
+        <div class="text-[10px] text-stone-500 truncate">${symbolOf(l)} • ${l.title}</div>
+      </div>
+    </div>
+    <button class="btn-ghost" onclick="closeChatModal()"><i data-lucide="x" class="w-5 h-5"></i></button>
+  `;
+  renderChat();
+  document.getElementById('chatModal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  if (window.lucide) lucide.createIcons();
+}
+function closeChatModal() { document.getElementById('chatModal').classList.add('hidden'); document.body.style.overflow = ''; currentChatPlot = null; }
+function renderChat() {
+  if (!currentChatPlot) return;
+  const thread = chats[currentChatPlot.id] || [];
+  document.getElementById('chatThread').innerHTML = thread.map(m => {
+    const time = new Date(m.at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+    return `<div class="flex flex-col ${m.from==='me'?'items-end':'items-start'}"><div class="${m.from==='me'?'bubble-me':'bubble-them'}">${m.text}</div><div class="text-[10px] text-stone-400 mt-0.5">${time}</div></div>`;
+  }).join('');
+  const t = document.getElementById('chatThread');
+  t.scrollTop = t.scrollHeight;
+}
+function quickChat(text) { document.getElementById('chatInput').value = text; sendChat(); }
+function sendChat() {
+  const inp = document.getElementById('chatInput');
+  const text = inp.value.trim();
+  if (!text || !currentChatPlot) return;
+  if (!chats[currentChatPlot.id]) chats[currentChatPlot.id] = [];
+  chats[currentChatPlot.id].push({ from:'me', text, at: Date.now() });
+  inp.value = '';
+  renderChat();
+  saveJSON(CHATS_KEY, chats);
+  // Mock seller reply
+  setTimeout(() => {
+    const replies = ['ขอบคุณที่สนใจครับ', 'พร้อมพาดูสถานที่จริง วันไหนสะดวกครับ?', 'ราคาต่อรองได้เล็กน้อยครับ', 'ดูเอกสารโฉนดได้ที่ออฟฟิศนะครับ', 'โทรหาเลยก็ได้ครับ ผมอยู่ในพื้นที่ครับ'];
+    const reply = replies[Math.floor(Math.random() * replies.length)];
+    chats[currentChatPlot.id].push({ from:'them', text: reply, at: Date.now() });
+    saveJSON(CHATS_KEY, chats);
+    renderChat();
+  }, 1500 + Math.random() * 1500);
+}
+
+// ============================================
+// VERIFY MODAL (ThaID mock flow)
+// ============================================
+function openVerifyModal(target='info') {
+  document.getElementById('verifyModal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  verifyStep = 0;
+  renderVerifyBody(target);
+  if (window.lucide) lucide.createIcons();
+}
+function closeVerifyModal() { document.getElementById('verifyModal').classList.add('hidden'); document.body.style.overflow = ''; verifyStep = 0; }
+function renderVerifyBody(target='info') {
+  const body = document.getElementById('verifyBody');
+  if (target === 'info') {
+    body.innerHTML = `
+      <div class="space-y-4">
+        <div class="bg-gradient-to-br from-emerald-50 to-sky-50 rounded-xl p-4 border border-stone-200">
+          <h3 class="display font-bold text-base mb-2">ทำไมต้องยืนยันตัวตน?</h3>
+          <p class="text-sm text-stone-700">ดินดีตรวจสอบเจ้าของที่ดินทุกคน เพื่อให้แน่ใจว่าคุณคุยกับเจ้าของจริง ไม่ใช่มิจฉาชีพ</p>
+        </div>
+        <div class="space-y-2.5">
+          <div class="flex items-start gap-3 p-3 border border-stone-200 rounded-lg">
+            <span class="tier-badge tier-1 shrink-0">? T1</span>
+            <div><div class="font-semibold text-sm">ผู้ใช้ทั่วไป (ฟรี)</div><div class="text-xs text-stone-600">ยืนยันเบอร์โทร + อีเมล — ดูที่ดินได้ บันทึก/เปรียบเทียบได้</div></div>
+          </div>
+          <div class="flex items-start gap-3 p-3 border border-sky-200 bg-sky-50 rounded-lg">
+            <span class="tier-badge tier-2 shrink-0">✓ T2</span>
+            <div class="flex-1"><div class="font-semibold text-sm">Verified Identity (จำเป็นสำหรับลงประกาศ)</div><div class="text-xs text-stone-600 mb-2">ยืนยันด้วย <strong>ThaID app</strong> (กรมการปกครอง 40+ ล้านคนใช้) หรือ eKYC ผ่านมือถือ</div>
+              <button class="btn-primary !py-1.5 !text-xs" onclick="startThaIdFlow()"><span class="bg-thaid text-white px-1.5 py-0.5 rounded text-[10px] font-bold">ThaID</span> ยืนยันเลย</button>
+            </div>
+          </div>
+          <div class="flex items-start gap-3 p-3 border border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-50 rounded-lg">
+            <span class="tier-badge tier-3 shrink-0">⭐ T3</span>
+            <div class="flex-1"><div class="font-semibold text-sm">Verified Owner (badge ทอง)</div><div class="text-xs text-stone-600 mb-2">T2 + อัปโหลดโฉนด — ระบบตรวจกับ LandsMaps + ชื่อตรงกับ ThaID — buyer เชื่อใจสูงสุด</div>
+              <button class="btn-secondary !py-1.5 !text-xs" onclick="startDeedFlow()" ${currentUser.tier<2?'disabled':''}><i data-lucide="upload" class="w-3.5 h-3.5"></i>อัปโหลดโฉนด</button>
+            </div>
+          </div>
+        </div>
+        <div class="text-xs text-stone-500 border-t border-stone-200 pt-3">
+          🔒 ข้อมูลส่วนตัวของคุณถูกเข้ารหัส เป็นไปตาม PDPA — ใช้ตรวจสอบเท่านั้น ไม่เผยแพร่
+        </div>
+        <div class="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+          ⚠️ <strong>Demo MVP:</strong> ฟลโลว์ ThaID + OCR เป็น mock การทำงานจริงต้องเชื่อมต่อ NDID Platform (~200฿/tx) และ LandsMaps DOL
+        </div>
+      </div>
+    `;
+  } else if (target === 'thaid-step1') {
+    body.innerHTML = `
+      <div class="text-center py-6">
+        <div class="bg-thaid w-20 h-20 mx-auto rounded-2xl flex items-center justify-center mb-4">
+          <span class="text-white font-extrabold text-2xl">ThaID</span>
+        </div>
+        <h3 class="display font-bold text-lg mb-2">เปิดแอป ThaID</h3>
+        <p class="text-sm text-stone-600 mb-4">สแกน QR หรือเปิดแอป ThaID เพื่อยืนยันตัวตน</p>
+        <div class="w-48 h-48 mx-auto bg-stone-100 rounded-xl flex items-center justify-center mb-4">
+          <div class="grid grid-cols-8 gap-0.5 p-2">
+            ${Array.from({length:64}).map(()=>`<div class="w-3 h-3 ${Math.random()>0.5?'bg-stone-900':'bg-white'}"></div>`).join('')}
+          </div>
+        </div>
+        <div class="text-xs text-stone-500 mb-4">รอการยืนยันจากแอป ThaID...</div>
+        <button class="btn-primary" onclick="renderVerifyBody('thaid-step2')">✅ ยืนยันแล้ว (Demo)</button>
+      </div>
+    `;
+  } else if (target === 'thaid-step2') {
+    body.innerHTML = `
+      <div class="py-4">
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-4">
+          <div class="flex items-center gap-2 mb-2"><i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-600"></i><span class="font-semibold text-emerald-900">ยืนยันสำเร็จกับ ThaID</span></div>
+          <div class="text-sm text-stone-700">ข้อมูลถูกดึงจากกรมการปกครอง (DOPA)</div>
+        </div>
+        <div class="space-y-2 mb-4">
+          <div class="flex justify-between text-sm p-2 bg-stone-50 rounded"><span class="text-stone-600">ชื่อ-นามสกุล:</span><span class="font-semibold">นาย ทดสอบ ดินดี</span></div>
+          <div class="flex justify-between text-sm p-2 bg-stone-50 rounded"><span class="text-stone-600">เลขประจำตัวประชาชน:</span><span class="mono font-semibold">1-2345-67890-12-3</span></div>
+          <div class="flex justify-between text-sm p-2 bg-stone-50 rounded"><span class="text-stone-600">วันเดือนปีเกิด:</span><span class="font-semibold">1 มกราคม 2533</span></div>
+          <div class="flex justify-between text-sm p-2 bg-stone-50 rounded"><span class="text-stone-600">สถานะ:</span><span class="font-semibold text-emerald-600">✓ ตรงกับฐานทะเบียนราษฎร์</span></div>
+        </div>
+        <button class="btn-primary w-full" onclick="completeThaId()"><i data-lucide="check" class="w-4 h-4"></i>ยอมรับและสำเร็จ</button>
+      </div>
+    `;
+  } else if (target === 'deed-step1') {
+    body.innerHTML = `
+      <div class="space-y-4">
+        <div class="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl p-4">
+          <h3 class="display font-bold mb-1">อัปโหลดโฉนดที่ดิน</h3>
+          <p class="text-sm text-stone-600">เพื่อยืนยันเป็น Verified Owner (badge ทอง) — ระบบจะ OCR เลขโฉนดและตรวจกับ LandsMaps</p>
+        </div>
+        <label class="block border-2 border-dashed border-amber-300 rounded-xl p-6 text-center cursor-pointer hover:border-amber-500 hover:bg-amber-50 transition">
+          <i data-lucide="file-text" class="w-10 h-10 text-amber-500 mx-auto mb-2"></i>
+          <div class="font-semibold">อัปโหลดรูปโฉนด (ด้านหน้า + ด้านหลัง)</div>
+          <div class="text-xs text-stone-500 mt-1">JPG/PNG/PDF — เก็บเป็นความลับ ใช้ตรวจสอบเท่านั้น</div>
+          <input type="file" multiple accept="image/*,.pdf" class="hidden" onchange="renderVerifyBody('deed-step2')" />
+        </label>
+        <div class="bg-sky-50 border border-sky-200 rounded-lg p-3 text-xs text-stone-700">
+          🔍 <strong>ระบบจะตรวจสอบ:</strong>
+          <ul class="list-disc list-inside mt-1 space-y-0.5">
+            <li>เลขโฉนด + ระวาง + ตำแหน่ง vs LandsMaps</li>
+            <li>ชื่อในโฉนด vs ชื่อ ThaID ของคุณ</li>
+            <li>ไม่มีการจำนอง/อายัด (NDID query ธนาคาร)</li>
+          </ul>
+        </div>
+      </div>
+    `;
+  } else if (target === 'deed-step2') {
+    body.innerHTML = `
+      <div class="py-4">
+        <div class="space-y-2 mb-4">
+          <div class="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+            <i data-lucide="loader" class="w-4 h-4 text-emerald-600 animate-spin"></i>
+            <span class="text-sm">OCR กำลังอ่านโฉนด...</span>
+          </div>
+        </div>
+        <button class="btn-primary w-full" onclick="renderVerifyBody('deed-step3')">ทดสอบขั้นถัดไป (Demo)</button>
+      </div>
+    `;
+  } else if (target === 'deed-step3') {
+    body.innerHTML = `
+      <div class="py-4">
+        <div class="bg-gradient-to-r from-amber-100 to-yellow-100 border border-amber-400 rounded-xl p-5 text-center mb-4">
+          <div class="text-4xl mb-2">⭐</div>
+          <h3 class="display font-bold text-xl text-amber-900">Verified Owner!</h3>
+          <p class="text-sm text-amber-800 mt-1">คุณได้รับ badge ทอง — ผู้ซื้อเชื่อใจสูงสุด</p>
+        </div>
+        <div class="space-y-1.5 text-sm mb-4">
+          <div class="flex justify-between p-2 bg-emerald-50 rounded"><span>📜 OCR เลขโฉนด:</span><span class="font-semibold text-emerald-700">✓ ตรงกับฐานข้อมูล</span></div>
+          <div class="flex justify-between p-2 bg-emerald-50 rounded"><span>🗺️ ตำแหน่งใน LandsMaps:</span><span class="font-semibold text-emerald-700">✓ พบ</span></div>
+          <div class="flex justify-between p-2 bg-emerald-50 rounded"><span>👤 ชื่อในโฉนด vs ThaID:</span><span class="font-semibold text-emerald-700">✓ ตรงกัน</span></div>
+          <div class="flex justify-between p-2 bg-emerald-50 rounded"><span>💰 สถานะจำนอง:</span><span class="font-semibold text-emerald-700">✓ ไม่ติดภาระ</span></div>
+        </div>
+        <button class="btn-primary w-full" onclick="completeDeedVerify()">เริ่มลงประกาศ</button>
+      </div>
+    `;
+  }
+  if (window.lucide) lucide.createIcons();
+}
+function startThaIdFlow() { renderVerifyBody('thaid-step1'); }
+function completeThaId() {
+  currentUser.tier = Math.max(currentUser.tier, 2);
+  currentUser.thaIdVerified = true;
+  currentUser.name = 'ทดสอบ ดินดี';
+  saveUser();
+  closeVerifyModal();
+  toast('✅ ยืนยันตัวตนสำเร็จ - ตอนนี้คุณเป็น Verified Identity (T2)');
+  updateAccountUI();
+}
+function startDeedFlow() {
+  if (currentUser.tier < 2) { toast('ต้องยืนยัน T2 ก่อน', false); return; }
+  renderVerifyBody('deed-step1');
+}
+function completeDeedVerify() {
+  currentUser.tier = 3;
+  currentUser.deedVerified = true;
+  saveUser();
+  closeVerifyModal();
+  toast('⭐ คุณได้รับ Verified Owner badge แล้ว!');
+  updateAccountUI();
+}
+
+// ============================================
+// ACCOUNT MENU
+// ============================================
+function toggleAccountMenu() {
+  document.getElementById('accountMenu').classList.toggle('hidden');
+  renderAccountMenu();
+}
+function updateAccountUI() {
+  document.getElementById('userAvatar').textContent = (currentUser.name||'?').charAt(0);
+  const tier = { level: currentUser.tier, icon: currentUser.tier>=3?'⭐':(currentUser.tier===2?'✓':'?'), shortLabel: currentUser.tier>=3?'Verified Owner':(currentUser.tier===2?'Verified ID':'Unverified') };
+  // re-render account menu next time it opens
+}
+function renderAccountMenu() {
+  const body = document.getElementById('accountMenuBody');
+  const u = currentUser;
+  const tier = { level: u.tier, icon: u.tier>=3?'⭐':(u.tier===2?'✓':'?'), label: u.tier>=3?'Verified Owner':(u.tier===2?'Verified Identity':'ไม่ได้ยืนยัน') };
+  body.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-stone-50 to-white border-b border-stone-200">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="w-12 h-12 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold">${(u.name||'?').charAt(0)}</div>
+        <div>
+          <div class="font-semibold text-sm">${u.name}</div>
+          <span class="tier-badge tier-${tier.level} mt-0.5">${tier.icon} ${tier.label}</span>
+        </div>
+      </div>
+      ${u.tier < 3 ? `<button class="btn-primary w-full !py-2 !text-xs" onclick="closeAccountMenu();openVerifyModal()"><i data-lucide="badge-check" class="w-3.5 h-3.5"></i>${u.tier<2?'ยืนยันตัวตน':'อัปเกรดเป็น Verified Owner'}</button>` : ''}
+    </div>
+    <div class="py-1">
+      <button class="w-full text-left px-4 py-2 text-sm hover:bg-stone-50 flex items-center gap-2" onclick="closeAccountMenu();openDashboard('mylistings')"><i data-lucide="list" class="w-4 h-4"></i>ประกาศของฉัน</button>
+      <button class="w-full text-left px-4 py-2 text-sm hover:bg-stone-50 flex items-center gap-2" onclick="closeAccountMenu();openDashboard('inquiries')"><i data-lucide="inbox" class="w-4 h-4"></i>คำถามที่ได้รับ</button>
+      <button class="w-full text-left px-4 py-2 text-sm hover:bg-stone-50 flex items-center gap-2" onclick="closeAccountMenu();openDashboard('searches')"><i data-lucide="bell" class="w-4 h-4"></i>การค้นหาที่บันทึก</button>
+      <button class="w-full text-left px-4 py-2 text-sm hover:bg-stone-50 flex items-center gap-2" onclick="closeAccountMenu();openDashboard('watched')"><i data-lucide="star" class="w-4 h-4"></i>รายการสนใจ</button>
+      <button class="w-full text-left px-4 py-2 text-sm hover:bg-stone-50 flex items-center gap-2" onclick="closeAccountMenu();openDashboard('profile')"><i data-lucide="user" class="w-4 h-4"></i>โปรไฟล์</button>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+}
+function closeAccountMenu() { document.getElementById('accountMenu').classList.add('hidden'); }
+
+// ============================================
+// DASHBOARD
+// ============================================
+function openDashboard(tab='profile') {
+  document.getElementById('dashboardModal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  setDashTab(tab);
+}
+function closeDashboard() { document.getElementById('dashboardModal').classList.add('hidden'); document.body.style.overflow = ''; }
+function setDashTab(name) {
+  document.querySelectorAll('[data-dtab]').forEach(b => b.classList.toggle('active', b.dataset.dtab === name));
+  const body = document.getElementById('dashboardBody');
+  const u = currentUser;
+  if (name === 'profile') {
+    const tier = { level: u.tier, icon: u.tier>=3?'⭐':(u.tier===2?'✓':'?'), label: u.tier>=3?'Verified Owner':(u.tier===2?'Verified Identity':'ไม่ได้ยืนยัน') };
+    body.innerHTML = `
+      <div class="space-y-4 max-w-xl">
+        <div class="flex items-center gap-4">
+          <div class="w-20 h-20 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-3xl">${(u.name||'?').charAt(0)}</div>
+          <div>
+            <div class="display text-xl font-bold">${u.name}</div>
+            <span class="tier-badge tier-${tier.level}">${tier.icon} ${tier.label}</span>
+            <div class="text-xs text-stone-500 mt-1">สมัครสมาชิก ${formatDate(u.joinedAt)}</div>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <div class="trust-row"><div class="${u.tier>=1?'trust-icon-ok':'trust-icon-warn'}"><i data-lucide="${u.tier>=1?'check':'x'}" class="w-3.5 h-3.5"></i></div><div>ยืนยันเบอร์โทร + อีเมล (T1)</div></div>
+          <div class="trust-row"><div class="${u.tier>=2?'trust-icon-ok':'trust-icon-warn'}"><i data-lucide="${u.tier>=2?'check':'x'}" class="w-3.5 h-3.5"></i></div><div>ยืนยัน ThaID/eKYC (T2)${u.tier<2?' — <button class="text-brand-600 font-semibold ml-1" onclick="closeDashboard();openVerifyModal()">ยืนยันเลย</button>':''}</div></div>
+          <div class="trust-row"><div class="${u.tier>=3?'trust-icon-ok':'trust-icon-warn'}"><i data-lucide="${u.tier>=3?'check':'x'}" class="w-3.5 h-3.5"></i></div><div>ตรวจโฉนดกับ LandsMaps (T3)${u.tier<3?' — <button class="text-brand-600 font-semibold ml-1" onclick="closeDashboard();openVerifyModal()">อัปเกรด</button>':''}</div></div>
+        </div>
+      </div>
+    `;
+  } else if (name === 'mylistings') {
+    const mine = listings.filter(l => l.ownerId === u.id);
+    body.innerHTML = mine.length ? `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">${mine.map(renderCard).join('')}</div>` : `<div class="text-center py-10 text-stone-500"><i data-lucide="list-x" class="w-10 h-10 mx-auto mb-2"></i><div>ยังไม่มีประกาศของคุณ</div><button class="btn-primary mt-3" onclick="closeDashboard();openAddModal()">ลงประกาศแรก</button></div>`;
+  } else if (name === 'inquiries') {
+    const myChats = Object.entries(chats).filter(([id, msgs]) => msgs.some(m => m.from === 'me'));
+    body.innerHTML = myChats.length ? myChats.map(([id, msgs]) => {
+      const l = listings.find(x => x.id === id);
+      if (!l) return '';
+      const last = msgs[msgs.length-1];
+      return `<div class="card p-3 mb-2 hover:border-brand-300 cursor-pointer" onclick="closeDashboard();openChatModal('${id}')"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-stone-200 flex items-center justify-center font-bold">${(l.ownerName||'?').charAt(0)}</div><div class="flex-1 min-w-0"><div class="font-semibold text-sm truncate">${l.title}</div><div class="text-xs text-stone-500 truncate">${last.text}</div></div></div></div>`;
+    }).join('') : `<div class="text-center py-10 text-stone-500">ยังไม่มีคำถาม</div>`;
+  } else if (name === 'searches') {
+    body.innerHTML = savedSearches.length ? savedSearches.map((s, i) => `
+      <div class="card p-3 mb-2 flex items-center justify-between">
+        <div><div class="font-semibold text-sm">${s.name}</div><div class="text-xs text-stone-500">${s.summary} • แจ้งเตือน${s.freq==='instant'?'ทันที':s.freq==='daily'?'รายวัน':'รายสัปดาห์'}</div></div>
+        <div class="flex gap-2"><button class="btn-secondary !py-1 !text-xs" onclick="applySavedSearch(${i})">เปิด</button><button class="btn-ghost !py-1 !text-rose-500" onclick="deleteSavedSearch(${i})"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>
+      </div>`).join('') : `<div class="text-center py-10 text-stone-500"><i data-lucide="bell-off" class="w-10 h-10 mx-auto mb-2"></i><div>ยังไม่มีการค้นหาที่บันทึก</div></div>`;
+  } else if (name === 'watched') {
+    const items = listings.filter(l => watchlist.has(l.id));
+    body.innerHTML = items.length ? `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">${items.map(renderCard).join('')}</div>` : `<div class="text-center py-10 text-stone-500">ยังไม่มีรายการสนใจ</div>`;
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
+// ============================================
+// SAVED SEARCH
+// ============================================
+function openSavedSearchModal() {
+  const f = filters;
+  const summary = [
+    f.province && `📍${f.province}`,
+    f.deed && `📜${f.deed}`,
+    f.road && `🛣️${f.road}`,
+    f.priceMin && `≥${(f.priceMin/1e6).toFixed(1)}ล้าน`,
+    f.priceMax && `≤${(f.priceMax/1e6).toFixed(1)}ล้าน`,
+    f.sizeMin && `≥${f.sizeMin}ไร่`,
+    f.verified && f.verified==='3' && 'Verified Owner only',
+  ].filter(Boolean).join(' • ') || 'ทั้งหมด';
+  document.getElementById('savedSearchSummary').textContent = summary;
+  document.getElementById('savedSearchModal').classList.remove('hidden');
+}
+function closeSavedSearchModal() { document.getElementById('savedSearchModal').classList.add('hidden'); }
+function saveCurrentSearch() {
+  const name = document.getElementById('savedSearchName').value.trim();
+  if (!name) { toast('ตั้งชื่อก่อน', false); return; }
+  const freq = document.querySelector('input[name="alertFreq"]:checked')?.value || 'daily';
+  savedSearches.push({
+    name, freq,
+    summary: document.getElementById('savedSearchSummary').textContent,
+    filters: {...filters},
+    channels: { inApp: document.getElementById('alertInApp').checked, email: document.getElementById('alertEmail').checked, line: document.getElementById('alertLine').checked },
+    at: Date.now()
+  });
+  saveJSON(SAVED_SEARCH_KEY, savedSearches);
+  closeSavedSearchModal();
+  toast('🔔 บันทึกการค้นหา + เปิดแจ้งเตือนแล้ว');
+}
+function applySavedSearch(i) {
+  const s = savedSearches[i];
+  filters = {...s.filters};
+  Object.entries(filters).forEach(([k,v]) => {
+    const el = document.getElementById('filter' + k.charAt(0).toUpperCase() + k.slice(1));
+    if (el && v != null) el.value = v;
+  });
+  closeDashboard();
+  renderListings();
+}
+function deleteSavedSearch(i) { savedSearches.splice(i,1); saveJSON(SAVED_SEARCH_KEY, savedSearches); setDashTab('searches'); }
+
+// ============================================
+// INIT
+// ============================================
+function init() {
+  listings = loadListings();
+  // Augment seed listings with verifyTier randomization for demo
+  listings.forEach((l,i) => {
+    if (l.verifyTier === undefined) {
+      // First 4 = T3 verified, next 4 = T2, rest = T1
+      if (l.verified) l.verifyTier = i < 4 ? 3 : 2;
+      else l.verifyTier = 1;
+    }
+    if (l.featured === undefined && i < 2) l.featured = true;
+    if (l.foreignerEligible === undefined) l.foreignerEligible = (l.useType === 'พาณิชย์' || l.ownerType === 'company');
+  });
+  saveListings(listings);
+  watchlist = loadWatchlist();
+  currentUser = loadUser();
+  recentlyViewed = loadJSON(RECENT_KEY, []);
+  compareList = loadJSON(COMPARE_KEY, []);
+  savedSearches = loadJSON(SAVED_SEARCH_KEY, []);
+  chats = loadJSON(CHATS_KEY, {});
+  reports = loadJSON(REPORTS_KEY, []);
+
+  const provOpts = PROVINCES.map(p=>`<option value="${p}">${p}</option>`).join('');
+  document.getElementById('filterProvince').innerHTML = '<option value="">📍 ทุกจังหวัด</option>' + provOpts;
+  document.getElementById('newProvince').innerHTML = '<option value="">เลือก</option>' + provOpts;
+
+  document.getElementById('globalSearch').addEventListener('input', e => {
+    filters.search = e.target.value;
+    applyFilters();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closeDetailView(); closeAddModal(); closeWatchlist();
+      closeCompareModal(); closeChatModal(); closeReportModal();
+      closeShareModal(); closeSavedSearchModal(); closeDashboard(); closeVerifyModal();
+    }
+  });
+
+  // Close account menu on outside click
+  document.addEventListener('click', e => {
+    const menu = document.getElementById('accountMenu');
+    if (!menu.classList.contains('hidden') && !e.target.closest('#accountMenu') && !e.target.closest('button[onclick*="toggleAccountMenu"]')) {
+      menu.classList.add('hidden');
+    }
+  });
+
+  const updateTime = () => {
+    const now = new Date();
+    document.getElementById('marketTime').textContent = `ข้อมูล ณ ${now.toLocaleDateString('th-TH')} ${now.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})}`;
+  };
+  updateTime();
+  setInterval(updateTime, 60000);
+
+  updateAccountUI();
+  setView('grid');
+  refreshAll();
+  renderNews();
+  renderRecent();
+  renderCompareBar();
+  animateHeroStats();
+
+  if (window.lucide) lucide.createIcons();
+}
+
+// ============================================
+// HERO ANIMATIONS + UX HELPERS
+// ============================================
+function scrollToMarket() {
+  document.querySelector('main').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function animateCounter(el, target, duration=1500) {
+  if (!el) return;
+  const start = 0;
+  const startTime = performance.now();
+  function step(now) {
+    const t = Math.min((now - startTime) / duration, 1);
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = Math.round(start + (target - start) * eased).toLocaleString();
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+function animateHeroStats() {
+  const provinces = new Set(listings.map(l => l.province)).size;
+  const totalRai = Math.round(listings.reduce((s,l) => s + (l.rai||0) + (l.ngan||0)/4 + (l.sqWah||0)/400, 0));
+  const verified = listings.filter(l => getTier(l).level >= 2).length;
+
+  // Hero small stats
+  animateCounter(document.getElementById('heroStat1'), listings.length, 800);
+  animateCounter(document.getElementById('heroStat2'), provinces, 1000);
+  animateCounter(document.getElementById('heroStat3'), totalRai, 1200);
+  animateCounter(document.getElementById('heroStat4'), verified, 900);
+
+  // Big trust section stats (only when scrolled into view)
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        animateCounter(document.getElementById('bigStat1'), listings.length, 1400);
+        animateCounter(document.getElementById('bigStat2'), provinces, 1600);
+        animateCounter(document.getElementById('bigStat3'), totalRai, 1800);
+        animateCounter(document.getElementById('bigStat4'), verified, 1400);
+        observer.disconnect();
+      }
+    });
+  }, { threshold: 0.3 });
+  const bigEl = document.getElementById('bigStat1');
+  if (bigEl) observer.observe(bigEl);
+
+  const t = document.getElementById('liveTime');
+  if (t) t.textContent = 'อัปเดต ' + new Date().toLocaleDateString('th-TH') + ' ' + new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
